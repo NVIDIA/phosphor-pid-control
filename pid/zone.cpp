@@ -17,6 +17,7 @@
 /* Configuration. */
 #include "zone.hpp"
 
+#include "actioncontroller.hpp"
 #include "conf.hpp"
 #include "pid/controller.hpp"
 #include "pid/ec/pid.hpp"
@@ -291,6 +292,10 @@ void DbusPidZone::writeLog(const std::string& value)
  */
 void DbusPidZone::updateFanTelemetry(void)
 {
+    int readFailureCnt = 0;
+    double setpoint = 0;
+    boost::asio::io_context io;
+    auto conn = std::make_shared<sdbusplus::asio::connection>(io);
     /* TODO(venture): Should I just make _log point to /dev/null when logging
      * is disabled?  I think it's a waste to try and log things even if the
      * data is just being dropped though.
@@ -309,6 +314,15 @@ void DbusPidZone::updateFanTelemetry(void)
         auto sensor = _mgr.getSensor(f);
         ReadReturn r = sensor->read();
         _cachedValuesByName[f] = r.value;
+        std::string sensorName = sensor->getName();
+        if (getPowerStatus(conn))
+        {
+            setpoint = processFanAction(r.value, sensorName, &readFailureCnt);
+        }
+        if (setpoint > 0)
+        {
+            DbusPidZone::addSetPoint(setpoint);
+        }
         int64_t timeout = sensor->getTimeout();
         tstamp then = r.updated;
 
@@ -371,7 +385,12 @@ void DbusPidZone::updateSensors(void)
 
         _cachedValuesByName[t] = r.value;
         tstamp then = r.updated;
-
+        std::string sensorName = sensor->getName();
+        double setpoint = processThermalAction(sensorName);
+        if (setpoint > 0)
+        {
+            DbusPidZone::addSetPoint(setpoint);
+        }
         auto duration = duration_cast<std::chrono::seconds>(now - then).count();
         auto period = std::chrono::seconds(timeout).count();
 
