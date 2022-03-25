@@ -37,9 +37,6 @@ static void processThermals(std::shared_ptr<ZoneInterface> zone)
 {
     // Get the latest margins.
     zone->updateSensors();
-    // Zero out the set point goals.
-    zone->clearSetPoints();
-    zone->clearRPMCeilings();
     // Run the margin PIDs.
     zone->processThermals();
     // Get the maximum RPM setpoint.
@@ -105,6 +102,10 @@ void pidControlLoop(std::shared_ptr<ZoneInterface> zone,
             pidControlLoop(zone, timer, isCanceling, false, ms100cnt);
             return;
         }
+
+        // Zero out the set point goals.
+        zone->clearSetPoints();
+        zone->clearRPMCeilings();
 
         // Get the latest fan speeds.
         zone->updateFanTelemetry();

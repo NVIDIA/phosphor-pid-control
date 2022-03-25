@@ -17,21 +17,28 @@
 #include "sysfs/sysfsread.hpp"
 
 #include <chrono>
+#include <filesystem>
 #include <fstream>
 #include <iostream>
 
 namespace pid_control
 {
 
+namespace fs = std::filesystem;
 ReadReturn SysFsRead::read(void)
 {
     int64_t value;
     std::ifstream ifs;
-
-    ifs.open(_path);
-    ifs >> value;
-    ifs.close();
-
+    if (fs::exists(_path))
+    {
+        ifs.open(_path);
+        ifs >> value;
+        ifs.close();
+    }
+    else
+    {
+        value = 0;
+    }
     ReadReturn r = {static_cast<double>(value),
                     std::chrono::high_resolution_clock::now()};
 
