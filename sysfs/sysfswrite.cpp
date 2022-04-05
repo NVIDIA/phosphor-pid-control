@@ -41,7 +41,6 @@ void SysFsWritePercent::write(double value)
 
 void SysFsWrite::write(double value)
 {
-    value = value * 100;
     std::ofstream ofs;
     ofs.open(_writePath);
     ofs << static_cast<int64_t>(value);

@@ -110,7 +110,6 @@ libswampd_la_SOURCES = \
 	pid/util.cpp \
 	pid/pidloop.cpp \
 	pid/tuning.cpp \
-	pid/actioncontroller.cpp \
 	build/buildjson.cpp \
 	experiments/drive.cpp
 
