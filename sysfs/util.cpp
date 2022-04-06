@@ -19,6 +19,7 @@
 #include <filesystem>
 #include <iostream>
 #include <string>
+
 namespace pid_control
 {
 
@@ -49,19 +50,19 @@ std::string FixupPath(std::string original)
         std::string base = original.substr(0, n);
         std::string fldr;
         std::string f = original.substr(n + 2, original.size() - (n + 2));
-        if (fs::exists(base) && fs::is_directory(base))
+
+        /* Equivalent to glob and grab 0th entry. */
+        for (const auto& folder : fs::directory_iterator(base))
         {
-            /* Equivalent to glob and grab 0th entry. */
-            for (const auto& folder : fs::directory_iterator(base))
-            {
-                fldr = folder.path();
-                break;
-            }
+            fldr = folder.path();
+            break;
         }
+
         if (!fldr.length())
         {
             return original;
         }
+
         return fldr + f;
     }
     else
