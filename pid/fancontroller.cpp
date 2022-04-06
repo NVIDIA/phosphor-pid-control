@@ -130,12 +130,11 @@ void FanController::outputProc(double value)
     {
         if (_owner->getFailSafeMode())
         {
-            // refrence https://github.com/openbmc/phosphor-pid-control/issues/2
             /* In case it's being set to 100% */
-            /*  if (percent < _owner->getFailSafePercent())
-              {
-                  percent = _owner->getFailSafePercent();
-              }*/
+            if (percent < _owner->getFailSafePercent())
+            {
+                percent = _owner->getFailSafePercent();
+            }
         }
     }
 
