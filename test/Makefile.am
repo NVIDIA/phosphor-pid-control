@@ -45,20 +45,24 @@ util_unittest_LDADD = $(top_builddir)/sensors/build_utils.o
 
 pid_zone_unittest_SOURCES = pid_zone_unittest.cpp
 pid_zone_unittest_LDADD = $(top_builddir)/pid/ec/pid.o \
+ $(top_builddir)/pid/ec/logging.o \
  $(top_builddir)/sensors/manager.o $(top_builddir)/pid/pidcontroller.o \
  $(top_builddir)/pid/zone.o $(top_builddir)/pid/tuning.o $(top_builddir)/pid/actioncontroller.o
 
 pid_thermalcontroller_unittest_SOURCES = pid_thermalcontroller_unittest.cpp
 pid_thermalcontroller_unittest_LDADD = $(top_builddir)/pid/ec/pid.o \
+ $(top_builddir)/pid/ec/logging.o $(top_builddir)/pid/tuning.o \
  $(top_builddir)/pid/util.o $(top_builddir)/pid/pidcontroller.o \
  $(top_builddir)/pid/thermalcontroller.o
 
 pid_stepwisecontroller_unittest_SOURCES = pid_stepwisecontroller_unittest.cpp
 pid_stepwisecontroller_unittest_LDADD = $(top_builddir)/pid/ec/stepwise.o \
- $(top_builddir)/pid/util.o $(top_builddir)/pid/stepwisecontroller.o
+ $(top_builddir)/pid/util.o $(top_builddir)/pid/stepwisecontroller.o \
+ $(top_builddir)/pid/tuning.o
 
 pid_fancontroller_unittest_SOURCES = pid_fancontroller_unittest.cpp
 pid_fancontroller_unittest_LDADD = $(top_builddir)/pid/ec/pid.o \
+ $(top_builddir)/pid/ec/logging.o \
  $(top_builddir)/pid/util.o $(top_builddir)/pid/pidcontroller.o \
  $(top_builddir)/pid/fancontroller.o $(top_builddir)/pid/tuning.o
 
@@ -79,7 +83,13 @@ pid_json_unittest_SOURCES = pid_json_unittest.cpp
 pid_json_unittest_LDADD = $(top_builddir)/pid/buildjson.o
 
 json_parse_unittest_SOURCES = json_parse_unittest.cpp
+<<<<<<< HEAD
 json_parse_unittest_LDADD = $(top_builddir)/build/buildjson.o
 
 oem_actioncontroller_unittest_SOURCES = oem_actioncontroller_unittest.cpp
 oem_actioncontroller_unittest_LDADD = $(top_builddir)/pid/actioncontroller.o
+||||||| a4146eb
+json_parse_unittest_LDADD = $(top_builddir)/build/buildjson.o
+=======
+json_parse_unittest_LDADD = $(top_builddir)/buildjson/buildjson.o
+>>>>>>> origin/master

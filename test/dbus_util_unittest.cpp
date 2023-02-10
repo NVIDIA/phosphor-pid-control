@@ -32,7 +32,7 @@ TEST_P(GetSensorPathTest, ReturnsExpectedValue)
                 StrEq(std::get<2>(params)));
 }
 
-INSTANTIATE_TEST_CASE_P(
+INSTANTIATE_TEST_SUITE_P(
     GetSensorPathTests, GetSensorPathTest,
     ::testing::Values(
         std::make_tuple("fan", "0", "/xyz/openbmc_project/sensors/fan_tach/0"),
@@ -40,7 +40,11 @@ INSTANTIATE_TEST_CASE_P(
         std::make_tuple("margin", "9",
                         "/xyz/openbmc_project/sensors/temperature/9"),
         std::make_tuple("temp", "123",
-                        "/xyz/openbmc_project/sensors/temperature/123")));
+                        "/xyz/openbmc_project/sensors/temperature/123"),
+        std::make_tuple("power", "9000",
+                        "/xyz/openbmc_project/sensors/power/9000"),
+        std::make_tuple("powersum", "total",
+                        "/xyz/openbmc_project/sensors/power/total")));
 
 class FindSensorsTest : public ::testing::Test
 {

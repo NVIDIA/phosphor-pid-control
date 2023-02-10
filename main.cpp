@@ -16,7 +16,7 @@
 
 #include "config.h"
 
-#include "build/buildjson.hpp"
+#include "buildjson/buildjson.hpp"
 #include "conf.hpp"
 #include "dbus/dbusconfiguration.hpp"
 #include "interfaces.hpp"
@@ -32,6 +32,7 @@
 
 #include <CLI/CLI.hpp>
 #include <boost/asio/io_context.hpp>
+#include <boost/asio/signal_set.hpp>
 #include <boost/asio/steady_timer.hpp>
 #include <sdbusplus/asio/connection.hpp>
 #include <sdbusplus/bus.hpp>
@@ -66,6 +67,8 @@ std::string configPath = "";
 
 /* async io context for operation */
 boost::asio::io_context io;
+/* async signal_set for signal handling */
+boost::asio::signal_set signals(io, SIGHUP);
 
 /* buses for system control */
 static sdbusplus::asio::connection modeControlBus(io);
@@ -211,11 +214,38 @@ void tryRestartControlLoops(bool first)
 
 } // namespace pid_control
 
+void sighupHandler(const boost::system::error_code& error, int signal_number)
+{
+    static boost::asio::steady_timer timer(io);
+
+    if (error)
+    {
+        std::cout << "Signal " << signal_number
+                  << " handler error: " << error.message() << "\n";
+        return;
+    }
+
+    timer.expires_after(std::chrono::seconds(1));
+    timer.async_wait([](const boost::system::error_code ec) {
+        if (ec)
+        {
+            std::cout << "Signal timer error: " << ec.message() << "\n";
+            return;
+        }
+
+        std::cout << "reloading configuration\n";
+        pid_control::tryRestartControlLoops();
+    });
+    signals.async_wait(sighupHandler);
+}
+
 int main(int argc, char* argv[])
 {
     loggingPath = "";
     loggingEnabled = false;
     tuningEnabled = false;
+    debugEnabled = false;
+    coreLoggingEnabled = false;
 
     CLI::App app{"OpenBMC Fan Control Daemon"};
 
@@ -226,11 +256,16 @@ int main(int argc, char* argv[])
                    "Optional parameter to specify logging folder")
         ->check(CLI::ExistingDirectory);
     app.add_flag("-t,--tuning", tuningEnabled, "Enable or disable tuning");
+    app.add_flag("-d,--debug", debugEnabled, "Enable or disable debug mode");
+    app.add_flag("-g,--corelogging", coreLoggingEnabled,
+                 "Enable or disable logging of core PID loop computations");
 
     CLI11_PARSE(app, argc, argv);
 
     static constexpr auto loggingEnablePath = "/etc/thermal.d/logging";
     static constexpr auto tuningEnablePath = "/etc/thermal.d/tuning";
+    static constexpr auto debugEnablePath = "/etc/thermal.d/debugging";
+    static constexpr auto coreLoggingEnablePath = "/etc/thermal.d/corelogging";
 
     // Set up default logging path, preferring command line if it was given
     std::string defLoggingPath(loggingPath);
@@ -248,19 +283,18 @@ int main(int argc, char* argv[])
     std::ifstream fsLogging(loggingEnablePath);
     if (fsLogging)
     {
-        // The first line of file might be a valid directory path
-        std::getline(fsLogging, loggingPath);
+        // Allow logging path to be changed by file content
+        std::string altPath;
+        std::getline(fsLogging, altPath);
         fsLogging.close();
 
-        // If so, use it, otherwise use default logging path instead
-        if (!(std::filesystem::exists(loggingPath)))
+        if (std::filesystem::exists(altPath))
         {
-            loggingPath = defLoggingPath;
+            loggingPath = altPath;
         }
 
         loggingEnabled = true;
     }
-
     if (loggingEnabled)
     {
         std::cerr << "Logging enabled: " << loggingPath << "\n";
@@ -271,20 +305,42 @@ int main(int argc, char* argv[])
     {
         tuningEnabled = true;
     }
-
-    // This can also be enabled from the command line
     if (tuningEnabled)
     {
         std::cerr << "Tuning enabled\n";
     }
 
+    // If this file exists, enable debug mode at runtime
+    if (std::filesystem::exists(debugEnablePath))
+    {
+        debugEnabled = true;
+    }
+
+    if (debugEnabled)
+    {
+        std::cerr << "Debug mode enabled\n";
+    }
+
+    // If this file exists, enable core logging at runtime
+    if (std::filesystem::exists(coreLoggingEnablePath))
+    {
+        coreLoggingEnabled = true;
+    }
+    if (coreLoggingEnabled)
+    {
+        std::cerr << "Core logging enabled\n";
+    }
+
     static constexpr auto modeRoot = "/xyz/openbmc_project/settings/fanctrl";
     // Create a manager for the ModeBus because we own it.
-    sdbusplus::server::manager::manager(
-        static_cast<sdbusplus::bus::bus&>(modeControlBus), modeRoot);
+    sdbusplus::server::manager_t(static_cast<sdbusplus::bus_t&>(modeControlBus),
+                                 modeRoot);
     hostBus.request_name("xyz.openbmc_project.Hwmon.external");
     modeControlBus.request_name("xyz.openbmc_project.State.FanCtrl");
-    sdbusplus::server::manager::manager objManager(modeControlBus, modeRoot);
+    sdbusplus::server::manager_t objManager(modeControlBus, modeRoot);
+
+    // Enable SIGHUP handling to reload JSON config
+    signals.async_wait(sighupHandler);
 
     /*
      * All sensors are managed by one manager, but each zone has a pointer to

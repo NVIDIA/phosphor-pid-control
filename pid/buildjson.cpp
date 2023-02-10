@@ -20,6 +20,7 @@
 
 #include <nlohmann/json.hpp>
 
+#include <iostream>
 #include <map>
 #include <tuple>
 
@@ -44,15 +45,21 @@ void from_json(const json& j, conf::ControllerInfo& c)
 
     auto positiveHysteresis = p.find("positiveHysteresis");
     auto negativeHysteresis = p.find("negativeHysteresis");
+    auto derivativeCoeff = p.find("derivativeCoeff");
     auto positiveHysteresisValue = 0.0;
     auto negativeHysteresisValue = 0.0;
+    auto derivativeCoeffValue = 0.0;
     if (positiveHysteresis != p.end())
     {
-        p.at("positiveHysteresis").get_to(positiveHysteresisValue);
+        positiveHysteresis->get_to(positiveHysteresisValue);
     }
     if (negativeHysteresis != p.end())
     {
-        p.at("negativeHysteresis").get_to(negativeHysteresisValue);
+        negativeHysteresis->get_to(negativeHysteresisValue);
+    }
+    if (derivativeCoeff != p.end())
+    {
+        derivativeCoeff->get_to(derivativeCoeffValue);
     }
 
     if (c.type != "stepwise")
@@ -69,8 +76,12 @@ void from_json(const json& j, conf::ControllerInfo& c)
         p.at("slewNeg").get_to(c.pidInfo.slewNeg);
         p.at("slewPos").get_to(c.pidInfo.slewPos);
 
+        // Unlike other coefficients, treat derivativeCoeff as an optional
+        // parameter, as support for it is fairly new, to avoid breaking
+        // existing configurations in the field that predate it.
         c.pidInfo.positiveHysteresis = positiveHysteresisValue;
         c.pidInfo.negativeHysteresis = negativeHysteresisValue;
+        c.pidInfo.derivativeCoeff = derivativeCoeffValue;
     }
     else
     {
@@ -118,6 +129,32 @@ void from_json(const json& j, conf::ControllerInfo& c)
 }
 } // namespace conf
 
+inline void getCycleTimeSetting(const auto& zone, const int id,
+                                const std::string& attributeName,
+                                uint64_t& value)
+{
+    auto findAttributeName = zone.find(attributeName);
+    if (findAttributeName != zone.end())
+    {
+        uint64_t tmpAttributeValue = 0;
+        findAttributeName->get_to(tmpAttributeValue);
+        if (tmpAttributeValue >= 1)
+        {
+            value = tmpAttributeValue;
+        }
+        else
+        {
+            std::cerr << "Zone " << id << ": " << attributeName
+                      << " is invalid. Use default " << value << " ms\n";
+        }
+    }
+    else
+    {
+        std::cerr << "Zone " << id << ": " << attributeName
+                  << " cannot find setting. Use default " << value << " ms\n";
+    }
+}
+
 std::pair<std::map<int64_t, conf::PIDConf>, std::map<int64_t, conf::ZoneConfig>>
     buildPIDsFromJson(const json& data)
 {
@@ -138,6 +175,11 @@ std::pair<std::map<int64_t, conf::PIDConf>, std::map<int64_t, conf::ZoneConfig>>
         id = zone["id"];
         thisZoneConfig.minThermalOutput = zone["minThermalOutput"];
         thisZoneConfig.failsafePercent = zone["failsafePercent"];
+
+        getCycleTimeSetting(zone, id, "cycleIntervalTimeMS",
+                            thisZoneConfig.cycleTime.cycleIntervalTimeMS);
+        getCycleTimeSetting(zone, id, "updateThermalsTimeMS",
+                            thisZoneConfig.cycleTime.updateThermalsTimeMS);
 
         auto pids = zone["pids"];
         for (const auto& pid : pids)

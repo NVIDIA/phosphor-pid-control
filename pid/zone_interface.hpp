@@ -16,6 +16,9 @@ class ZoneInterface
   public:
     virtual ~ZoneInterface() = default;
 
+    /** Get Current Zone ID */
+    virtual int64_t getZoneID(void) const = 0;
+
     /** If the zone implementation supports logging, initialize the log. */
     virtual void initializeLog(void) = 0;
     /** If the zone implementation supports logging, write string to log. */
@@ -42,11 +45,26 @@ class ZoneInterface
      */
     virtual void initializeCache(void) = 0;
 
+    /** Optionally adds fan outputs to an output cache, which is different
+     * from the input cache accessed by getCachedValue(), so it is possible
+     * to have entries with the same name in both the output cache and
+     * the input cache. The output cache is used for logging, to show
+     * the PWM values determined by the PID loop, next to the resulting RPM.
+     */
+    virtual void setOutputCache(std::string_view name,
+                                const ValueCacheEntry& values) = 0;
+
     /** Return cached value for sensor by name. */
     virtual double getCachedValue(const std::string& name) = 0;
+    /** Return cached values, both scaled and original unscaled values,
+     * for sensor by name. Subclasses can add trivial return {value, value},
+     * for subclasses that only implement getCachedValue() and do not care
+     * about maintaining the distinction between scaled and unscaled values.
+     */
+    virtual ValueCacheEntry getCachedValues(const std::string& name) = 0;
 
     /** Add a set point value for the Max Set Point computation. */
-    virtual void addSetPoint(double setpoint) = 0;
+    virtual void addSetPoint(double setpoint, const std::string& name) = 0;
     /** Clear all set points specified via addSetPoint */
     virtual void clearSetPoints(void) = 0;
 
@@ -71,6 +89,10 @@ class ZoneInterface
      * fail safe.
      */
     virtual double getFailSafePercent() const = 0;
+
+    /** Return the zone's cycle time settings */
+    virtual uint64_t getCycleIntervalTime(void) const = 0;
+    virtual uint64_t getUpdateThermalsCycle(void) const = 0;
 
     /** Return if the zone is set to manual mode.  false equates to automatic
      * mode (the default).

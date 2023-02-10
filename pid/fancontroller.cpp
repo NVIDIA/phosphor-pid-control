@@ -46,15 +46,17 @@ std::unique_ptr<PIDController>
 
 double FanController::inputProc(void)
 {
-    double value = 0;
-    std::vector<int64_t> values;
-    std::vector<int64_t>::iterator result;
+    double value = 0.0;
+    std::vector<double> values;
+    std::vector<double>::iterator result;
 
     try
     {
         for (const auto& name : _inputs)
         {
-            value = _owner->getCachedValue(name);
+            // Read the unscaled value, to correctly recover the RPM
+            value = _owner->getCachedValues(name).unscaled;
+
             /* If we have a fan we can't read, its value will be 0 for at least
              * some boards, while others... the fan will drop off dbus (if
              * that's how it's being read and in that case its value will never
@@ -67,7 +69,7 @@ double FanController::inputProc(void)
             {
                 continue;
             }
-            if (value <= 0)
+            if (value <= 0.0)
             {
                 continue;
             }
@@ -82,7 +84,7 @@ double FanController::inputProc(void)
     }
 
     /* Reset the value from the above loop. */
-    value = 0;
+    value = 0.0;
     if (values.size() > 0)
     {
         /* the fan PID algorithm was unstable with average, and seemed to work
@@ -130,16 +132,43 @@ void FanController::outputProc(double value)
     {
         if (_owner->getFailSafeMode())
         {
-            /* In case it's being set to 100% */
-            if (percent < _owner->getFailSafePercent())
+            double failsafePercent = _owner->getFailSafePercent();
+
+#ifdef STRICT_FAILSAFE_PWM
+            // Unconditionally replace the computed PWM with the
+            // failsafe PWM if STRICT_FAILSAFE_PWM is defined.
+            percent = failsafePercent;
+#else
+            // Ensure PWM is never lower than the failsafe PWM.
+            // The computed PWM is still allowed to rise higher than
+            // failsafe PWM if STRICT_FAILSAFE_PWM is NOT defined.
+            // This is the default behavior.
+            if (percent < failsafePercent)
             {
-                percent = _owner->getFailSafePercent();
+                percent = failsafePercent;
+            }
+
+            if (failsafePrint || debugEnabled)
+            {
+                std::cerr << "Zone " << _owner->getZoneID()
+                          << " fans output failsafe pwm: " << percent << "\n";
+                failsafePrint = false;
+            }
+#endif
+        }
+        else
+        {
+            failsafePrint = true;
+            if (debugEnabled)
+            {
+                std::cerr << "Zone " << _owner->getZoneID()
+                          << " fans output pwm: " << percent << "\n";
             }
         }
     }
 
     // value and kFanFailSafeDutyCycle are 10 for 10% so let's fix that.
-    percent /= 100;
+    percent /= 100.0;
 
     // PidSensorMap for writing.
     for (const auto& it : _inputs)
@@ -148,6 +177,12 @@ void FanController::outputProc(double value)
         auto redundantWrite = _owner->getRedundantWrite();
         int64_t rawWritten;
         sensor->write(percent, redundantWrite, &rawWritten);
+
+        // The outputCache will be used later,
+        // to store a record of the PWM commanded,
+        // so that this information can be included during logging.
+        auto unscaledWritten = static_cast<double>(rawWritten);
+        _owner->setOutputCache(sensor->getName(), {percent, unscaledWritten});
     }
 
     return;

@@ -1,3 +1,4 @@
+#include "pid/ec/logging.hpp"
 #include "pid/ec/pid.hpp"
 #include "pid/zone.hpp"
 #include "sensors/manager.hpp"
@@ -50,14 +51,15 @@ TEST(PidZoneConstructorTest, BoringConstructorTest)
     int64_t zone = 1;
     double minThermalOutput = 1000.0;
     double failSafePercent = 0.75;
+    conf::CycleTime cycleTime;
 
     double d;
     std::vector<std::string> properties;
     SetupDbusObject(&sdbus_mock_mode, defer, objPath, modeInterface, properties,
                     &d);
 
-    DbusPidZone p(zone, minThermalOutput, failSafePercent, m, bus_mock_mode,
-                  objPath, defer);
+    DbusPidZone p(zone, minThermalOutput, failSafePercent, cycleTime, m,
+                  bus_mock_mode, objPath, defer);
     // Success.
 }
 
@@ -87,7 +89,7 @@ class PidZoneTest : public ::testing::Test
                         properties, &property_index);
 
         zone = std::make_unique<DbusPidZone>(zoneId, minThermalOutput,
-                                             failSafePercent, mgr,
+                                             failSafePercent, cycleTime, mgr,
                                              bus_mock_mode, objPath, defer);
     }
 
@@ -104,6 +106,7 @@ class PidZoneTest : public ::testing::Test
     bool defer = true;
     const char* objPath = "/path/";
     SensorManager mgr;
+    conf::CycleTime cycleTime;
 
     std::unique_ptr<DbusPidZone> zone;
 };
@@ -161,14 +164,14 @@ TEST_F(PidZoneTest, SetManualMode_RedundantWritesEnabledOnceAfterManualMode)
 TEST_F(PidZoneTest, RpmSetPoints_AddMaxClear_BehaveAsExpected)
 {
     // Tests addSetPoint, clearSetPoints, determineMaxSetPointRequest
-    // and getMinThermalSetpoint.
+    // and getMinThermalSetPoint.
 
     // At least one value must be above the minimum thermal setpoint used in
     // the constructor otherwise it'll choose that value
     std::vector<double> values = {100, 200, 300, 400, 500, 5000};
     for (auto v : values)
     {
-        zone->addSetPoint(v);
+        zone->addSetPoint(v, "");
     }
 
     // This will pull the maximum RPM setpoint request.
@@ -180,7 +183,7 @@ TEST_F(PidZoneTest, RpmSetPoints_AddMaxClear_BehaveAsExpected)
 
     // This will go through the RPM set point values and grab the maximum.
     zone->determineMaxSetPointRequest();
-    EXPECT_EQ(zone->getMinThermalSetpoint(), zone->getMaxSetPointRequest());
+    EXPECT_EQ(zone->getMinThermalSetPoint(), zone->getMaxSetPointRequest());
 }
 
 TEST_F(PidZoneTest, RpmSetPoints_AddBelowMinimum_BehavesAsExpected)
@@ -191,14 +194,14 @@ TEST_F(PidZoneTest, RpmSetPoints_AddBelowMinimum_BehavesAsExpected)
     std::vector<double> values = {100, 200, 300, 400, 500};
     for (auto v : values)
     {
-        zone->addSetPoint(v);
+        zone->addSetPoint(v, "");
     }
 
     // This will pull the maximum RPM setpoint request.
     zone->determineMaxSetPointRequest();
 
     // Verifies the value returned in the minimal thermal rpm set point.
-    EXPECT_EQ(zone->getMinThermalSetpoint(), zone->getMaxSetPointRequest());
+    EXPECT_EQ(zone->getMinThermalSetPoint(), zone->getMaxSetPointRequest());
 }
 
 TEST_F(PidZoneTest, GetFailSafePercent_ReturnsExpected)
@@ -558,11 +561,12 @@ TEST_F(PidZoneTest, ManualModeDbusTest_VerifySetManualBehavesAsExpected)
     EXPECT_CALL(sdbus_mock_mode,
                 sd_bus_emit_properties_changed_strv(
                     IsNull(), StrEq(objPath), StrEq(modeInterface), NotNull()))
-        .WillOnce(Invoke([&](sd_bus* bus, const char* path,
-                             const char* interface, const char** names) {
-            EXPECT_STREQ("Manual", names[0]);
-            return 0;
-        }));
+        .WillOnce(Invoke(
+            [&]([[maybe_unused]] sd_bus* bus, [[maybe_unused]] const char* path,
+                [[maybe_unused]] const char* interface, const char** names) {
+                EXPECT_STREQ("Manual", names[0]);
+                return 0;
+            }));
 
     // Method under test will set the manual mode to true and broadcast this
     // change on dbus.

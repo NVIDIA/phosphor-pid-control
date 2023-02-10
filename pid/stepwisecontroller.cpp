@@ -18,6 +18,7 @@
 
 #include "ec/stepwise.hpp"
 #include "errors/exception.hpp"
+#include "tuning.hpp"
 #include "util.hpp"
 #include "zone.hpp"
 
@@ -74,7 +75,6 @@ std::unique_ptr<Controller> StepwiseController::createStepwiseController(
     if (inputs.empty())
     {
         throw ControllerBuildException("Stepwise controller missing inputs");
-        return nullptr;
     }
 
     auto thermal = std::make_unique<StepwiseController>(id, inputs, owner);
@@ -90,6 +90,13 @@ double StepwiseController::inputProc(void)
     {
         value = std::max(value, _owner->getCachedValue(in));
     }
+
+    if (debugEnabled)
+    {
+        std::cerr << getID()
+                  << " choose the maximum temperature value: " << value << "\n";
+    }
+
     return value;
 }
 
@@ -101,7 +108,11 @@ void StepwiseController::outputProc(double value)
     }
     else
     {
-        _owner->addSetPoint(value);
+        _owner->addSetPoint(value, _id);
+        if (debugEnabled)
+        {
+            std::cerr << getID() << " stepwise output pwm: " << value << "\n";
+        }
     }
     return;
 }

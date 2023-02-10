@@ -18,8 +18,18 @@ class ZoneMock : public ZoneInterface
     MOCK_METHOD0(updateSensors, void());
     MOCK_METHOD0(initializeCache, void());
     MOCK_METHOD1(getCachedValue, double(const std::string&));
+
+    // Compatibility interface for getCachedValues
+    ValueCacheEntry getCachedValues(const std::string& s)
+    {
+        auto v = getCachedValue(s);
+        return ValueCacheEntry(v, v);
+    }
+
     MOCK_CONST_METHOD0(getRedundantWrite, bool(void));
-    MOCK_METHOD1(addSetPoint, void(double));
+    MOCK_METHOD2(addSetPoint, void(double, const std::string&));
+    MOCK_METHOD2(setOutputCache,
+                 void(std::string_view name, const ValueCacheEntry& values));
     MOCK_METHOD0(clearSetPoints, void());
     MOCK_METHOD1(addRPMCeiling, void(double));
     MOCK_METHOD0(clearRPMCeilings, void());
@@ -32,6 +42,10 @@ class ZoneMock : public ZoneInterface
     MOCK_CONST_METHOD0(getManualMode, bool());
     MOCK_CONST_METHOD0(getFailSafeMode, bool());
     MOCK_CONST_METHOD0(getFailSafePercent, double());
+    MOCK_CONST_METHOD0(getZoneID, int64_t());
+
+    MOCK_CONST_METHOD0(getCycleIntervalTime, uint64_t());
+    MOCK_CONST_METHOD0(getUpdateThermalsCycle, uint64_t());
 
     MOCK_METHOD1(getSensor, Sensor*(const std::string&));
 

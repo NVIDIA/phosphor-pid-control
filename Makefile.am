@@ -100,6 +100,7 @@ libswampd_la_SOURCES = \
 	sensors/build_utils.cpp \
 	pid/ec/pid.cpp \
 	pid/ec/stepwise.cpp \
+	pid/ec/logging.cpp \
 	pid/fancontroller.cpp \
 	pid/thermalcontroller.cpp \
 	pid/pidcontroller.cpp \
@@ -110,8 +111,14 @@ libswampd_la_SOURCES = \
 	pid/util.cpp \
 	pid/pidloop.cpp \
 	pid/tuning.cpp \
+<<<<<<< HEAD
 	pid/actioncontroller.cpp \
 	build/buildjson.cpp \
+||||||| a4146eb
+	build/buildjson.cpp \
+=======
+	buildjson/buildjson.cpp \
+>>>>>>> origin/master
 	experiments/drive.cpp
 
 libmanualcmdsdir = ${libdir}/ipmid-providers

@@ -41,12 +41,12 @@ class DbusPassive : public ReadInterface
 {
   public:
     static std::unique_ptr<ReadInterface> createDbusPassive(
-        sdbusplus::bus::bus& bus, const std::string& type,
-        const std::string& id, std::unique_ptr<DbusHelperInterface> helper,
+        sdbusplus::bus_t& bus, const std::string& type, const std::string& id,
+        std::unique_ptr<DbusHelperInterface> helper,
         const conf::SensorConfig* info,
         const std::shared_ptr<DbusPassiveRedundancy>& redundancy);
 
-    DbusPassive(sdbusplus::bus::bus& bus, const std::string& type,
+    DbusPassive(sdbusplus::bus_t& bus, const std::string& type,
                 const std::string& id,
                 std::unique_ptr<DbusHelperInterface> helper,
                 const SensorProperties& settings, bool failed,
@@ -57,6 +57,7 @@ class DbusPassive : public ReadInterface
     bool getFailed(void) const override;
 
     void updateValue(double value, bool force);
+    void setValue(double value, double unscaled);
     void setValue(double value);
 
     void setFailed(bool value);
@@ -76,6 +77,7 @@ class DbusPassive : public ReadInterface
 
     std::mutex _lock;
     double _value = 0;
+    double _unscaled = 0;
     double _max = 0;
     double _min = 0;
     bool _failed = false;
@@ -94,6 +96,6 @@ class DbusPassive : public ReadInterface
     std::chrono::high_resolution_clock::time_point _updated;
 };
 
-int handleSensorValue(sdbusplus::message::message& msg, DbusPassive* owner);
+int handleSensorValue(sdbusplus::message_t& msg, DbusPassive* owner);
 
 } // namespace pid_control

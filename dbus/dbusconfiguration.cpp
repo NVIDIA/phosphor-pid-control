@@ -81,7 +81,7 @@ inline std::string sensorNameToDbusName(const std::string& sensorName)
     return retString;
 }
 
-std::vector<std::string> getSelectedProfiles(sdbusplus::bus::bus& bus)
+std::vector<std::string> getSelectedProfiles(sdbusplus::bus_t& bus)
 {
     std::vector<std::string> ret;
     auto mapper =
@@ -158,10 +158,11 @@ int eventHandler(sd_bus_message* m, void* context, sd_bus_error*)
     }
 
     // we skip associations because the mapper populates these, not the sensors
-    const std::array<const char*, 1> skipList = {
-        "xyz.openbmc_project.Association"};
+    const std::array<const char*, 2> skipList = {
+        "xyz.openbmc_project.Association",
+        "xyz.openbmc_project.Association.Definitions"};
 
-    sdbusplus::message::message message(m);
+    sdbusplus::message_t message(m);
     if (std::string(message.get_member()) == "InterfacesAdded")
     {
         sdbusplus::message::object_path path;
@@ -181,6 +182,19 @@ int eventHandler(sd_bus_message* m, void* context, sd_bus_error*)
                 if (data.empty())
                 {
                     return 1;
+                }
+            }
+        }
+
+        if constexpr (pid_control::conf::DEBUG)
+        {
+            std::cout << "New config detected: " << path.str << std::endl;
+            for (auto& d : data)
+            {
+                std::cout << "\tdata is " << d.first << std::endl;
+                for (auto& second : d.second)
+                {
+                    std::cout << "\t\tdata is " << second.first << std::endl;
                 }
             }
         }
@@ -206,10 +220,10 @@ int eventHandler(sd_bus_message* m, void* context, sd_bus_error*)
     return 1;
 }
 
-void createMatches(sdbusplus::bus::bus& bus, boost::asio::steady_timer& timer)
+void createMatches(sdbusplus::bus_t& bus, boost::asio::steady_timer& timer)
 {
     // this is a list because the matches can't be moved
-    static std::list<sdbusplus::bus::match::match> matches;
+    static std::list<sdbusplus::bus::match_t> matches;
 
     const std::array<std::string, 4> interfaces = {
         thermalControlIface, pidConfigurationInterface,
@@ -257,8 +271,34 @@ inline DbusVariantType getPIDAttribute(
     return search->second;
 }
 
+inline void getCycleTimeSetting(
+    const std::unordered_map<std::string, DbusVariantType>& zone,
+    const int zoneIndex, const std::string& attributeName, uint64_t& value)
+{
+    auto findAttributeName = zone.find(attributeName);
+    if (findAttributeName != zone.end())
+    {
+        double tmpAttributeValue =
+            std::visit(VariantToDoubleVisitor(), zone.at(attributeName));
+        if (tmpAttributeValue >= 1.0)
+        {
+            value = static_cast<uint64_t>(tmpAttributeValue);
+        }
+        else
+        {
+            std::cerr << "Zone " << zoneIndex << ": " << attributeName
+                      << " is invalid. Use default " << value << " ms\n";
+        }
+    }
+    else
+    {
+        std::cerr << "Zone " << zoneIndex << ": " << attributeName
+                  << " cannot find setting. Use default " << value << " ms\n";
+    }
+}
+
 void populatePidInfo(
-    sdbusplus::bus::bus& bus,
+    [[maybe_unused]] sdbusplus::bus_t& bus,
     const std::unordered_map<std::string, DbusVariantType>& base,
     conf::ControllerInfo& info, const std::string* thresholdProperty,
     const std::map<std::string, conf::SensorConfig>& sensorConfig)
@@ -296,7 +336,7 @@ void populatePidInfo(
             helper.getProperty(service, path, interface, *thresholdProperty,
                                reading);
         }
-        catch (const sdbusplus::exception::exception& ex)
+        catch (const sdbusplus::exception_t& ex)
         {
             // unsupported threshold, leaving reading at 0
         }
@@ -309,6 +349,7 @@ void populatePidInfo(
         VariantToDoubleVisitor(), getPIDAttribute(base, "PCoefficient"));
     info.pidInfo.integralCoeff = std::visit(
         VariantToDoubleVisitor(), getPIDAttribute(base, "ICoefficient"));
+    // DCoefficient is below, it is optional, same reason as in buildjson.cpp
     info.pidInfo.feedFwdOffset = std::visit(
         VariantToDoubleVisitor(), getPIDAttribute(base, "FFOffCoefficient"));
     info.pidInfo.feedFwdGain = std::visit(
@@ -325,28 +366,37 @@ void populatePidInfo(
         std::visit(VariantToDoubleVisitor(), getPIDAttribute(base, "SlewNeg"));
     info.pidInfo.slewPos =
         std::visit(VariantToDoubleVisitor(), getPIDAttribute(base, "SlewPos"));
+
     double negativeHysteresis = 0;
     double positiveHysteresis = 0;
+    double derivativeCoeff = 0;
 
     auto findNeg = base.find("NegativeHysteresis");
     auto findPos = base.find("PositiveHysteresis");
+    auto findDerivative = base.find("DCoefficient");
 
     if (findNeg != base.end())
     {
         negativeHysteresis =
             std::visit(VariantToDoubleVisitor(), findNeg->second);
     }
-
     if (findPos != base.end())
     {
         positiveHysteresis =
             std::visit(VariantToDoubleVisitor(), findPos->second);
     }
+    if (findDerivative != base.end())
+    {
+        derivativeCoeff =
+            std::visit(VariantToDoubleVisitor(), findDerivative->second);
+    }
+
     info.pidInfo.negativeHysteresis = negativeHysteresis;
     info.pidInfo.positiveHysteresis = positiveHysteresis;
+    info.pidInfo.derivativeCoeff = derivativeCoeff;
 }
 
-bool init(sdbusplus::bus::bus& bus, boost::asio::steady_timer& timer,
+bool init(sdbusplus::bus_t& bus, boost::asio::steady_timer& timer,
           std::map<std::string, conf::SensorConfig>& sensorConfig,
           std::map<int64_t, conf::PIDConf>& zoneConfig,
           std::map<int64_t, conf::ZoneConfig>& zoneDetailsConfig)
@@ -571,6 +621,11 @@ bool init(sdbusplus::bus::bus& bus, boost::asio::steady_timer& timer,
                                                   zone.at("MinThermalOutput"));
             details.failsafePercent = std::visit(VariantToDoubleVisitor(),
                                                  zone.at("FailSafePercent"));
+
+            getCycleTimeSetting(zone, index, "CycleIntervalTimeMS",
+                                details.cycleTime.cycleIntervalTimeMS);
+            getCycleTimeSetting(zone, index, "UpdateThermalsTimeMS",
+                                details.cycleTime.updateThermalsTimeMS);
         }
         auto findBase = configuration.second.find(pidConfigurationInterface);
         // loop through all the PID configurations and fill out a sensor config
@@ -637,20 +692,29 @@ bool init(sdbusplus::bus::bus& bus, boost::asio::steady_timer& timer,
                         inputSensorInterface.second;
                     const std::string& inputSensorPath =
                         inputSensorInterface.first;
-                    std::string inputSensorName =
-                        getSensorNameFromPath(inputSensorPath);
-                    auto& config = sensorConfig[inputSensorName];
-                    inputSensorNames.push_back(inputSensorName);
-                    config.type = pidClass;
-                    config.readPath = inputSensorInterface.first;
-                    // todo: maybe un-hardcode this if we run into slower
-                    // timeouts with sensors
-                    if (config.type == "temp")
+
+                    // Setting timeout to 0 is intentional, as D-Bus passive
+                    // sensor updates are pushed in, not pulled by timer poll.
+                    // Setting ignoreDbusMinMax is intentional, as this
+                    // prevents normalization of values to [0.0, 1.0] range,
+                    // which would mess up the PID loop math.
+                    // All non-fan PID classes should be initialized this way.
+                    // As for why a fan should not use this code path, see
+                    // the ed1dafdf168def37c65bfb7a5efd18d9dbe04727 commit.
+                    if ((pidClass == "temp") || (pidClass == "margin") ||
+                        (pidClass == "power") || (pidClass == "powersum"))
                     {
+                        std::string inputSensorName =
+                            getSensorNameFromPath(inputSensorPath);
+                        auto& config = sensorConfig[inputSensorName];
+                        inputSensorNames.push_back(inputSensorName);
+                        config.type = pidClass;
+                        config.readPath = inputSensorInterface.first;
                         config.timeout = 0;
                         config.ignoreDbusMinMax = true;
                         config.unavailableAsFailed = unavailableAsFailed;
                     }
+
                     if (dbusInterface != sensorInterface)
                     {
                         /* all expected inputs in the configuration are expected
@@ -696,6 +760,7 @@ bool init(sdbusplus::bus::bus& bus, boost::asio::steady_timer& timer,
                     std::string fanSensorName;
                     std::string pwmPath;
                     std::string pwmInterface;
+                    std::string pwmSensorName;
                     if (singlePwm)
                     {
                         /* if just a single output(pwm) is provided then use
@@ -726,7 +791,12 @@ bool init(sdbusplus::bus::bus& bus, boost::asio::steady_timer& timer,
                         const std::string& fanPath =
                             inputSensorInterfaces.at(idx).first;
                         fanSensorName = getSensorNameFromPath(fanPath);
-                        auto& fanConfig = sensorConfig[fanSensorName];
+                        pwmSensorName = getSensorNameFromPath(pwmPath);
+                        std::string fanPwmIndex = fanSensorName + pwmSensorName;
+                        inputSensorNames.push_back(fanPwmIndex);
+                        auto& fanConfig = sensorConfig[fanPwmIndex];
+                        fanConfig.type = pidClass;
+                        fanConfig.readPath = fanPath;
                         fanConfig.writePath = pwmPath;
                         // todo: un-hardcode this if there are fans with
                         // different ranges

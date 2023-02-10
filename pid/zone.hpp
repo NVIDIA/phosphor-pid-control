@@ -20,7 +20,7 @@
 #include <vector>
 
 template <typename... T>
-using ServerObject = typename sdbusplus::server::object::object<T...>;
+using ServerObject = typename sdbusplus::server::object_t<T...>;
 using ModeInterface = sdbusplus::xyz::openbmc_project::Control::server::Mode;
 using ModeObject = ServerObject<ModeInterface>;
 
@@ -36,14 +36,26 @@ class DbusPidZone : public ZoneInterface, public ModeObject
 {
   public:
     DbusPidZone(int64_t zone, double minThermalOutput, double failSafePercent,
+<<<<<<< HEAD
                 const SensorManager& mgr, sdbusplus::bus::bus& bus,
                 const char* objPath, bool defer) :
         ModeObject(bus, objPath,
                    defer ? ModeObject::action::defer_emit
                          : ModeObject::action::emit_object_added),
+||||||| a4146eb
+                const SensorManager& mgr, sdbusplus::bus::bus& bus,
+                const char* objPath, bool defer) :
+        ModeObject(bus, objPath, defer),
+=======
+                conf::CycleTime cycleTime, const SensorManager& mgr,
+                sdbusplus::bus_t& bus, const char* objPath, bool defer) :
+        ModeObject(bus, objPath,
+                   defer ? ModeObject::action::defer_emit
+                         : ModeObject::action::emit_object_added),
+>>>>>>> origin/master
         _zoneId(zone), _maximumSetPoint(),
         _minThermalOutputSetPt(minThermalOutput),
-        _failSafePercent(failSafePercent), _mgr(mgr)
+        _failSafePercent(failSafePercent), _cycleTime(cycleTime), _mgr(mgr)
     {
         if (loggingEnabled)
         {
@@ -60,20 +72,23 @@ class DbusPidZone : public ZoneInterface, public ModeObject
     void setManualMode(bool mode);
     bool getFailSafeMode(void) const override;
 
-    int64_t getZoneID(void) const;
-    void addSetPoint(double setpoint) override;
+    int64_t getZoneID(void) const override;
+    void addSetPoint(double setPoint, const std::string& name) override;
     double getMaxSetPointRequest(void) const override;
     void addRPMCeiling(double ceiling) override;
     void clearSetPoints(void) override;
     void clearRPMCeilings(void) override;
     double getFailSafePercent(void) const override;
-    double getMinThermalSetpoint(void) const;
+    double getMinThermalSetPoint(void) const;
+    uint64_t getCycleIntervalTime(void) const override;
+    uint64_t getUpdateThermalsCycle(void) const override;
 
     Sensor* getSensor(const std::string& name) override;
     void determineMaxSetPointRequest(void) override;
     void updateFanTelemetry(void) override;
     void updateSensors(void) override;
     void initializeCache(void) override;
+    void setOutputCache(std::string_view, const ValueCacheEntry&) override;
     void dumpCache(void);
 
     void processFans(void) override;
@@ -82,6 +97,8 @@ class DbusPidZone : public ZoneInterface, public ModeObject
     void addFanPID(std::unique_ptr<Controller> pid);
     void addThermalPID(std::unique_ptr<Controller> pid);
     double getCachedValue(const std::string& name) override;
+    ValueCacheEntry getCachedValues(const std::string& name) override;
+
     void addFanInput(const std::string& fan);
     void addThermalInput(const std::string& therm);
 
@@ -98,10 +115,13 @@ class DbusPidZone : public ZoneInterface, public ModeObject
 
     const int64_t _zoneId;
     double _maximumSetPoint = 0;
+    std::string _maximumSetPointName;
+    std::string _maximumSetPointNamePrev;
     bool _manualMode = false;
     bool _redundantWrite = false;
     const double _minThermalOutputSetPt;
     const double _failSafePercent;
+    const conf::CycleTime _cycleTime;
 
     std::set<std::string> _failSafeSensors;
 
@@ -109,7 +129,8 @@ class DbusPidZone : public ZoneInterface, public ModeObject
     std::vector<double> _RPMCeilings;
     std::vector<std::string> _fanInputs;
     std::vector<std::string> _thermalInputs;
-    std::map<std::string, double> _cachedValuesByName;
+    std::map<std::string, ValueCacheEntry> _cachedValuesByName;
+    std::map<std::string, ValueCacheEntry> _cachedFanOutputs;
     const SensorManager& _mgr;
 
     std::vector<std::unique_ptr<Controller>> _fans;

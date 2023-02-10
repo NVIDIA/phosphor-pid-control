@@ -35,7 +35,7 @@ void scaleHelper(T& ptr, int64_t value)
 
 std::unique_ptr<Sensor> HostSensor::createTemp(const std::string& name,
                                                int64_t timeout,
-                                               sdbusplus::bus::bus& bus,
+                                               sdbusplus::bus_t& bus,
                                                const char* objPath, bool defer)
 {
     auto sensor =
@@ -91,7 +91,7 @@ ReadReturn HostSensor::read(void)
     return r;
 }
 
-void HostSensor::write(double value)
+void HostSensor::write([[maybe_unused]] double value)
 {
     throw std::runtime_error("Not Implemented.");
 }

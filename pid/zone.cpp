@@ -102,9 +102,18 @@ int64_t DbusPidZone::getZoneID(void) const
     return _zoneId;
 }
 
-void DbusPidZone::addSetPoint(double setpoint)
+void DbusPidZone::addSetPoint(double setPoint, const std::string& name)
 {
-    _SetPoints.push_back(setpoint);
+    _SetPoints.push_back(setPoint);
+    /*
+     * if there are multiple thermal controllers with the same
+     * value, pick the first one in the iterator
+     */
+    if (_maximumSetPoint < setPoint)
+    {
+        _maximumSetPoint = setPoint;
+        _maximumSetPointName = name;
+    }
 }
 
 void DbusPidZone::addRPMCeiling(double ceiling)
@@ -120,6 +129,7 @@ void DbusPidZone::clearRPMCeilings(void)
 void DbusPidZone::clearSetPoints(void)
 {
     _SetPoints.clear();
+    _maximumSetPoint = 0;
 }
 
 double DbusPidZone::getFailSafePercent(void) const
@@ -127,9 +137,19 @@ double DbusPidZone::getFailSafePercent(void) const
     return _failSafePercent;
 }
 
-double DbusPidZone::getMinThermalSetpoint(void) const
+double DbusPidZone::getMinThermalSetPoint(void) const
 {
     return _minThermalOutputSetPt;
+}
+
+uint64_t DbusPidZone::getCycleIntervalTime(void) const
+{
+    return _cycleTime.cycleIntervalTimeMS;
+}
+
+uint64_t DbusPidZone::getUpdateThermalsCycle(void) const
+{
+    return _cycleTime.updateThermalsTimeMS;
 }
 
 void DbusPidZone::addFanPID(std::unique_ptr<Controller> pid)
@@ -144,7 +164,18 @@ void DbusPidZone::addThermalPID(std::unique_ptr<Controller> pid)
 
 double DbusPidZone::getCachedValue(const std::string& name)
 {
+    return _cachedValuesByName.at(name).scaled;
+}
+
+ValueCacheEntry DbusPidZone::getCachedValues(const std::string& name)
+{
     return _cachedValuesByName.at(name);
+}
+
+void DbusPidZone::setOutputCache(std::string_view name,
+                                 const ValueCacheEntry& values)
+{
+    _cachedFanOutputs[std::string{name}] = values;
 }
 
 void DbusPidZone::addFanInput(const std::string& fan)
@@ -211,27 +242,46 @@ static bool fileParseRpm(const std::string& fileName, double& rpmValue)
 
 void DbusPidZone::determineMaxSetPointRequest(void)
 {
-    double max = 0;
     std::vector<double>::iterator result;
-
-    if (_SetPoints.size() > 0)
-    {
-        result = std::max_element(_SetPoints.begin(), _SetPoints.end());
-        max = *result;
-    }
+    double minThermalThreshold = getMinThermalSetPoint();
 
     if (_RPMCeilings.size() > 0)
     {
         result = std::min_element(_RPMCeilings.begin(), _RPMCeilings.end());
-        max = std::min(max, *result);
+        // if Max set point is larger than the lowest ceiling, reset to lowest
+        // ceiling.
+        if (*result < _maximumSetPoint)
+        {
+            _maximumSetPoint = *result;
+            // When using lowest ceiling, controller name is ceiling.
+            _maximumSetPointName = "Ceiling";
+        }
     }
 
     /*
      * If the maximum RPM setpoint output is below the minimum RPM
      * setpoint, set it to the minimum.
      */
-    max = std::max(getMinThermalSetpoint(), max);
-
+    if (minThermalThreshold >= _maximumSetPoint)
+    {
+        _maximumSetPoint = minThermalThreshold;
+        _maximumSetPointName = "";
+    }
+    else if (_maximumSetPointName.compare(_maximumSetPointNamePrev))
+    {
+        std::cerr << "PID Zone " << _zoneId << " max SetPoint "
+                  << _maximumSetPoint << " requested by "
+                  << _maximumSetPointName;
+        for (const auto& sensor : _failSafeSensors)
+        {
+            if (sensor.find("Fan") == std::string::npos)
+            {
+                std::cerr << " " << sensor;
+            }
+        }
+        std::cerr << "\n";
+        _maximumSetPointNamePrev.assign(_maximumSetPointName);
+    }
     if (tuningEnabled)
     {
         /*
@@ -241,46 +291,43 @@ void DbusPidZone::determineMaxSetPointRequest(void)
          */
         static constexpr auto setpointpath = "/etc/thermal.d/setpoint";
 
-        fileParseRpm(setpointpath, max);
+        fileParseRpm(setpointpath, _maximumSetPoint);
 
         // Allow per-zone setpoint files to override overall setpoint file
         std::ostringstream zoneSuffix;
         zoneSuffix << ".zone" << _zoneId;
         std::string zoneSetpointPath = setpointpath + zoneSuffix.str();
 
-        fileParseRpm(zoneSetpointPath, max);
+        fileParseRpm(zoneSetpointPath, _maximumSetPoint);
     }
-
-    _maximumSetPoint = max;
     return;
 }
 
 void DbusPidZone::initializeLog(void)
 {
     /* Print header for log file:
-     * epoch_ms,setpt,fan1,fan2,fanN,sensor1,sensor2,sensorN,failsafe
+     * epoch_ms,setpt,fan1,fan1_raw,fan1_pwm,fan1_pwm_raw,fan2,fan2_raw,fan2_pwm,fan2_pwm_raw,fanN,fanN_raw,fanN_pwm,fanN_pwm_raw,sensor1,sensor1_raw,sensor2,sensor2_raw,sensorN,sensorN_raw,failsafe
      */
 
-    _log << "epoch_ms,setpt";
+    _log << "epoch_ms,setpt,requester";
 
     for (const auto& f : _fanInputs)
     {
-        _log << "," << f;
+        _log << "," << f << "," << f << "_raw";
+        _log << "," << f << "_pwm," << f << "_pwm_raw";
     }
     for (const auto& t : _thermalInputs)
     {
-        _log << "," << t;
+        _log << "," << t << "," << t << "_raw";
     }
+
     _log << ",failsafe";
     _log << std::endl;
-
-    return;
 }
 
 void DbusPidZone::writeLog(const std::string& value)
 {
     _log << value;
-    return;
 }
 
 /*
@@ -313,12 +360,14 @@ void DbusPidZone::updateFanTelemetry(void)
                     now.time_since_epoch())
                     .count();
         _log << "," << _maximumSetPoint;
+        _log << "," << _maximumSetPointName;
     }
 
     for (const auto& f : _fanInputs)
     {
         auto sensor = _mgr.getSensor(f);
         ReadReturn r = sensor->read();
+<<<<<<< HEAD
         _cachedValuesByName[f] = r.value;
         std::string sensorName = sensor->getName();
         if (getPowerStatus(conn))
@@ -329,6 +378,11 @@ void DbusPidZone::updateFanTelemetry(void)
         {
             DbusPidZone::addSetPoint(setpoint);
         }
+||||||| a4146eb
+        _cachedValuesByName[f] = r.value;
+=======
+        _cachedValuesByName[f] = {r.value, r.unscaled};
+>>>>>>> origin/master
         int64_t timeout = sensor->getTimeout();
         tstamp then = r.updated;
 
@@ -343,17 +397,33 @@ void DbusPidZone::updateFanTelemetry(void)
          */
         if (loggingEnabled)
         {
-            _log << "," << r.value;
+            const auto& v = _cachedValuesByName[f];
+            _log << "," << v.scaled << "," << v.unscaled;
+            const auto& p = _cachedFanOutputs[f];
+            _log << "," << p.scaled << "," << p.unscaled;
+        }
+
+        if (debugEnabled)
+        {
+            std::cerr << f << " fan sensor reading: " << r.value << "\n";
         }
 
         // check if fan fail.
         if (sensor->getFailed())
         {
             _failSafeSensors.insert(f);
+            if (debugEnabled)
+            {
+                std::cerr << f << " fan sensor get failed\n";
+            }
         }
         else if (timeout != 0 && duration >= period)
         {
             _failSafeSensors.insert(f);
+            if (debugEnabled)
+            {
+                std::cerr << f << " fan sensor timeout\n";
+            }
         }
         else
         {
@@ -361,6 +431,10 @@ void DbusPidZone::updateFanTelemetry(void)
             auto kt = _failSafeSensors.find(f);
             if (kt != _failSafeSensors.end())
             {
+                if (debugEnabled)
+                {
+                    std::cerr << f << " is erased from failsafe sensor set\n";
+                }
                 _failSafeSensors.erase(kt);
             }
         }
@@ -370,7 +444,8 @@ void DbusPidZone::updateFanTelemetry(void)
     {
         for (const auto& t : _thermalInputs)
         {
-            _log << "," << _cachedValuesByName[t];
+            const auto& v = _cachedValuesByName[t];
+            _log << "," << v.scaled << "," << v.unscaled;
         }
     }
 
@@ -389,7 +464,7 @@ void DbusPidZone::updateSensors(void)
         ReadReturn r = sensor->read();
         int64_t timeout = sensor->getTimeout();
 
-        _cachedValuesByName[t] = r.value;
+        _cachedValuesByName[t] = {r.value, r.unscaled};
         tstamp then = r.updated;
         std::string sensorName = sensor->getName();
         double setpoint = processThermalAction(sensorName);
@@ -400,14 +475,28 @@ void DbusPidZone::updateSensors(void)
         auto duration = duration_cast<std::chrono::seconds>(now - then).count();
         auto period = std::chrono::seconds(timeout).count();
 
+        if (debugEnabled)
+        {
+            std::cerr << t << " temperature sensor reading: " << r.value
+                      << "\n";
+        }
+
         if (sensor->getFailed())
         {
             _failSafeSensors.insert(t);
+            if (debugEnabled)
+            {
+                std::cerr << t << " temperature sensor get failed\n";
+            }
         }
         else if (timeout != 0 && duration >= period)
         {
             // std::cerr << "Entering fail safe mode.\n";
             _failSafeSensors.insert(t);
+            if (debugEnabled)
+            {
+                std::cerr << t << " temperature sensor get timeout\n";
+            }
         }
         else
         {
@@ -415,6 +504,10 @@ void DbusPidZone::updateSensors(void)
             auto kt = _failSafeSensors.find(t);
             if (kt != _failSafeSensors.end())
             {
+                if (debugEnabled)
+                {
+                    std::cerr << t << " is erased from failsafe sensor set\n";
+                }
                 _failSafeSensors.erase(kt);
             }
         }
@@ -427,7 +520,8 @@ void DbusPidZone::initializeCache(void)
 {
     for (const auto& f : _fanInputs)
     {
-        _cachedValuesByName[f] = 0;
+        _cachedValuesByName[f] = {0, 0};
+        _cachedFanOutputs[f] = {0, 0};
 
         // Start all fans in fail-safe mode.
         _failSafeSensors.insert(f);
@@ -435,7 +529,7 @@ void DbusPidZone::initializeCache(void)
 
     for (const auto& t : _thermalInputs)
     {
-        _cachedValuesByName[t] = 0;
+        _cachedValuesByName[t] = {0, 0};
 
         // Start all sensors in fail-safe mode.
         _failSafeSensors.insert(t);
@@ -447,7 +541,15 @@ void DbusPidZone::dumpCache(void)
     std::cerr << "Cache values now: \n";
     for (const auto& [name, value] : _cachedValuesByName)
     {
-        std::cerr << name << ": " << value << "\n";
+        std::cerr << name << ": " << value.scaled << " " << value.unscaled
+                  << "\n";
+    }
+
+    std::cerr << "Fan outputs now: \n";
+    for (const auto& [name, value] : _cachedFanOutputs)
+    {
+        std::cerr << name << ": " << value.scaled << " " << value.unscaled
+                  << "\n";
     }
 }
 

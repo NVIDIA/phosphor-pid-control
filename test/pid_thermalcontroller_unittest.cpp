@@ -1,3 +1,4 @@
+#include "pid/ec/logging.hpp"
 #include "pid/ec/pid.hpp"
 #include "pid/thermalcontroller.hpp"
 #include "test/zone_mock.hpp"
@@ -104,7 +105,7 @@ TEST(ThermalControllerTest, OutputProc_BehavesAsExpected)
     EXPECT_FALSE(p == nullptr);
 
     double value = 90.0;
-    EXPECT_CALL(z, addSetPoint(value));
+    EXPECT_CALL(z, addSetPoint(value, "therm1"));
 
     p->outputProc(value);
 }
@@ -151,6 +152,27 @@ TEST(ThermalControllerTest, InputProc_MultipleInputsMargin)
     EXPECT_EQ(5.0, p->inputProc());
 }
 
+TEST(ThermalControllerTest, InputProc_MultipleInputsSummation)
+{
+    // This test verifies inputProc behaves as expected with multiple summation
+    // inputs.
+
+    ZoneMock z;
+
+    std::vector<std::string> inputs = {"fleeting0", "fleeting1"};
+    double setpoint = 10.0;
+    ec::pidinfo initial;
+
+    std::unique_ptr<PIDController> p = ThermalController::createThermalPid(
+        &z, "therm1", inputs, setpoint, initial, ThermalType::summation);
+    EXPECT_FALSE(p == nullptr);
+
+    EXPECT_CALL(z, getCachedValue(StrEq("fleeting0"))).WillOnce(Return(5.0));
+    EXPECT_CALL(z, getCachedValue(StrEq("fleeting1"))).WillOnce(Return(10.0));
+
+    EXPECT_EQ(15.0, p->inputProc());
+}
+
 TEST(ThermalControllerTest, NegHysteresis_BehavesAsExpected)
 {
 
@@ -175,7 +197,7 @@ TEST(ThermalControllerTest, NegHysteresis_BehavesAsExpected)
         .WillOnce(Return(9.0))
         .WillOnce(Return(7.0));
 
-    EXPECT_CALL(z, addSetPoint(_)).Times(3);
+    EXPECT_CALL(z, addSetPoint(_, "therm1")).Times(3);
 
     std::vector<double> lastReadings = {12.0, 12.0, 7.0};
     for (auto& reading : lastReadings)
@@ -208,7 +230,7 @@ TEST(ThermalControllerTest, PosHysteresis_BehavesAsExpected)
         .WillOnce(Return(13.0))
         .WillOnce(Return(14.0));
 
-    EXPECT_CALL(z, addSetPoint(_)).Times(3);
+    EXPECT_CALL(z, addSetPoint(_, "therm1")).Times(3);
 
     std::vector<double> lastReadings = {8.0, 8.0, 14.0};
     for (auto& reading : lastReadings)

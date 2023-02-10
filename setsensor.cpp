@@ -43,7 +43,7 @@ static void SetHostSensor(void)
         auto responseMsg = PropertyWriteBus.call(pimMsg);
         fprintf(stderr, "call to Set the host sensor value succeeded.\n");
     }
-    catch (const sdbusplus::exception::exception& ex)
+    catch (const sdbusplus::exception_t& ex)
     {
         fprintf(stderr, "call to Set the host sensor value failed.\n");
     }
@@ -76,13 +76,13 @@ static void SetManualMode(int8_t zone)
         auto responseMsg = PropertyWriteBus.call(pimMsg);
         fprintf(stderr, "call to Set the manual mode succeeded.\n");
     }
-    catch (const sdbusplus::exception::exception& ex)
+    catch (const sdbusplus::exception_t& ex)
     {
         fprintf(stderr, "call to Set the manual mode failed.\n");
     }
 }
 
-int main(int argc, char* argv[])
+int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[])
 {
     int rc = 0;
 

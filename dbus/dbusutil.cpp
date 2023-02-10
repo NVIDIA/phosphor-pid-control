@@ -90,7 +90,7 @@ bool findSensors(const std::unordered_map<std::string, std::string>& sensors,
 
 std::string getSensorPath(const std::string& type, const std::string& id)
 {
-    std::string layer = type;
+    std::string layer;
     if (type == "fan")
     {
         layer = "fan_tach";
@@ -103,6 +103,14 @@ std::string getSensorPath(const std::string& type, const std::string& id)
     {
         layer = "temperature";
     }
+    else if (type == "power")
+    {
+        layer = "power";
+    }
+    else if (type == "powersum")
+    {
+        layer = "power";
+    }
     else
     {
         layer = "unknown"; // TODO(venture): Need to handle.
@@ -111,18 +119,19 @@ std::string getSensorPath(const std::string& type, const std::string& id)
     return std::string("/xyz/openbmc_project/sensors/" + layer + "/" + id);
 }
 
-std::string getMatch(const std::string& type, const std::string& id)
+std::string getMatch(const std::string& path)
 {
     return std::string("type='signal',"
                        "interface='org.freedesktop.DBus.Properties',"
                        "member='PropertiesChanged',"
                        "path='" +
-                       getSensorPath(type, id) + "'");
+                       path + "'");
 }
 
 bool validType(const std::string& type)
 {
-    static std::set<std::string> valid = {"fan", "temp", "margin"};
+    static std::set<std::string> valid = {"fan", "temp", "margin", "power",
+                                          "powersum"};
     return (valid.find(type) != valid.end());
 }
 

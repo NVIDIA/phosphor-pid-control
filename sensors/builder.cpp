@@ -44,7 +44,7 @@ static constexpr bool deferSignals = true;
 
 SensorManager
     buildSensors(const std::map<std::string, conf::SensorConfig>& config,
-                 sdbusplus::bus::bus& passive, sdbusplus::bus::bus& host)
+                 sdbusplus::bus_t& passive, sdbusplus::bus_t& host)
 {
     SensorManager mgmr(passive, host);
     auto& hostSensorBus = mgmr.getHostBus();
@@ -162,7 +162,8 @@ SensorManager
                 name, info->timeout, std::move(ri), std::move(wi));
             mgmr.addSensor(info->type, name, std::move(sensor));
         }
-        else if (info->type == "temp" || info->type == "margin")
+        else if (info->type == "temp" || info->type == "margin" ||
+                 info->type == "power" || info->type == "powersum")
         {
             // These sensors are read-only, but only for this application
             // which only writes to fan sensors.
