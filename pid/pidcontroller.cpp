@@ -32,9 +32,9 @@ namespace pid_control
 
 void PIDController::process(void)
 {
-    double input;
-    double setpt;
-    double output;
+    double input = 0;
+    double setpt = 0;
+    double output = 0;
 
     // Get setpt value
     setpt = setptProc();

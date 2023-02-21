@@ -23,7 +23,8 @@ class ZoneMock : public ZoneInterface
     ValueCacheEntry getCachedValues(const std::string& s)
     {
         auto v = getCachedValue(s);
-        return ValueCacheEntry(v, v);
+        ValueCacheEntry ret = {v, v};
+        return ret;
     }
 
     MOCK_CONST_METHOD0(getRedundantWrite, bool(void));

@@ -345,8 +345,6 @@ void DbusPidZone::writeLog(const std::string& value)
  */
 void DbusPidZone::updateFanTelemetry(void)
 {
-    int readFailureCnt = 0;
-    double setpoint = 0;
     boost::asio::io_context io;
     auto conn = std::make_shared<sdbusplus::asio::connection>(io);
     /* TODO(venture): Should I just make _log point to /dev/null when logging
@@ -367,22 +365,7 @@ void DbusPidZone::updateFanTelemetry(void)
     {
         auto sensor = _mgr.getSensor(f);
         ReadReturn r = sensor->read();
-<<<<<<< HEAD
-        _cachedValuesByName[f] = r.value;
-        std::string sensorName = sensor->getName();
-        if (getPowerStatus(conn))
-        {
-            setpoint = processFanAction(r.value, sensorName, &readFailureCnt);
-        }
-        if (setpoint > 0)
-        {
-            DbusPidZone::addSetPoint(setpoint);
-        }
-||||||| a4146eb
-        _cachedValuesByName[f] = r.value;
-=======
         _cachedValuesByName[f] = {r.value, r.unscaled};
->>>>>>> origin/master
         int64_t timeout = sensor->getTimeout();
         tstamp then = r.updated;
 
@@ -470,7 +453,7 @@ void DbusPidZone::updateSensors(void)
         double setpoint = processThermalAction(sensorName);
         if (setpoint > 0)
         {
-            DbusPidZone::addSetPoint(setpoint);
+            DbusPidZone::addSetPoint(setpoint,sensorName);
         }
         auto duration = duration_cast<std::chrono::seconds>(now - then).count();
         auto period = std::chrono::seconds(timeout).count();

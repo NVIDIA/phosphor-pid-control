@@ -58,6 +58,14 @@ TEST(DbusPassiveTest, BoringConstructorTest)
     auto helper = std::make_unique<DbusHelperMock>();
     SensorProperties properties;
 
+    properties.scale = -3;
+    properties.value = 10;
+    properties.unit = "x";
+    properties.min = 0;
+    properties.max = 3000;
+    properties.available = false;
+    properties.unavailableAsFailed = false;
+
     DbusPassive(bus_mock, type, id, std::move(helper), properties, false, path,
                 nullptr);
     // Success

@@ -83,13 +83,4 @@ pid_json_unittest_SOURCES = pid_json_unittest.cpp
 pid_json_unittest_LDADD = $(top_builddir)/pid/buildjson.o
 
 json_parse_unittest_SOURCES = json_parse_unittest.cpp
-<<<<<<< HEAD
-json_parse_unittest_LDADD = $(top_builddir)/build/buildjson.o
-
-oem_actioncontroller_unittest_SOURCES = oem_actioncontroller_unittest.cpp
-oem_actioncontroller_unittest_LDADD = $(top_builddir)/pid/actioncontroller.o
-||||||| a4146eb
-json_parse_unittest_LDADD = $(top_builddir)/build/buildjson.o
-=======
 json_parse_unittest_LDADD = $(top_builddir)/buildjson/buildjson.o
->>>>>>> origin/master

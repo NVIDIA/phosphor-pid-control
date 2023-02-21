@@ -94,20 +94,22 @@ TEST(ThermalControllerTest, OutputProc_BehavesAsExpected)
 {
     // This test just verifies outputProc behaves as expected.
 
-    ZoneMock z;
+    ZoneMock* z = new ZoneMock();
 
     std::vector<std::string> inputs = {"fleeting0"};
     double setpoint = 10.0;
     ec::pidinfo initial;
 
     std::unique_ptr<PIDController> p = ThermalController::createThermalPid(
-        &z, "therm1", inputs, setpoint, initial, ThermalType::margin);
+        z, "therm1", inputs, setpoint, initial, ThermalType::margin);
     EXPECT_FALSE(p == nullptr);
 
     double value = 90.0;
-    EXPECT_CALL(z, addSetPoint(value, "therm1"));
+    EXPECT_CALL(*z, addSetPoint(value, "therm1"));
 
     p->outputProc(value);
+
+    delete z;
 }
 
 TEST(ThermalControllerTest, InputProc_MultipleInputsAbsolute)
@@ -180,24 +182,37 @@ TEST(ThermalControllerTest, NegHysteresis_BehavesAsExpected)
     // crossing the setpoint and noticing readings don't change until past the
     // hysteresis value
 
-    ZoneMock z;
+    ZoneMock* z = new ZoneMock();
 
     std::vector<std::string> inputs = {"fleeting0"};
     double setpoint = 10.0;
     ec::pidinfo initial;
     initial.negativeHysteresis = 4.0;
+    initial.ts = 0;
+    initial.proportionalCoeff = 0;
+    initial.integralCoeff = 0;
+    initial.derivativeCoeff = 0;
+    initial.feedFwdOffset = 0;
+    initial.feedFwdGain = 0;
+    initial.integralLimit.min = 0;
+    initial.integralLimit.max = 0;
+    initial.outLim.min = 0;
+    initial.outLim.max = 0;
+    initial.slewNeg = 0;
+    initial.slewPos = 0;
+    initial.positiveHysteresis = 0;
 
     std::unique_ptr<PIDController> p = ThermalController::createThermalPid(
-        &z, "therm1", inputs, setpoint, initial, ThermalType::margin);
+        z, "therm1", inputs, setpoint, initial, ThermalType::margin);
     EXPECT_FALSE(p == nullptr);
 
-    EXPECT_CALL(z, getCachedValue(StrEq("fleeting0")))
+    EXPECT_CALL(*z, getCachedValue(StrEq("fleeting0")))
         .Times(3)
         .WillOnce(Return(12.0))
         .WillOnce(Return(9.0))
         .WillOnce(Return(7.0));
 
-    EXPECT_CALL(z, addSetPoint(_, "therm1")).Times(3);
+    EXPECT_CALL(*z, addSetPoint(_, "therm1")).Times(3);
 
     std::vector<double> lastReadings = {12.0, 12.0, 7.0};
     for (auto& reading : lastReadings)
@@ -205,6 +220,8 @@ TEST(ThermalControllerTest, NegHysteresis_BehavesAsExpected)
         p->process();
         EXPECT_EQ(p->getLastInput(), reading);
     }
+
+    delete z;
 }
 
 TEST(ThermalControllerTest, PosHysteresis_BehavesAsExpected)
@@ -213,24 +230,38 @@ TEST(ThermalControllerTest, PosHysteresis_BehavesAsExpected)
     // crossing the setpoint and noticing readings don't change until past the
     // hysteresis value
 
-    ZoneMock z;
+    ZoneMock* z = new ZoneMock();
 
     std::vector<std::string> inputs = {"fleeting0"};
     double setpoint = 10.0;
     ec::pidinfo initial;
     initial.positiveHysteresis = 5.0;
 
+    initial.ts = 0;
+    initial.proportionalCoeff = 0;
+    initial.integralCoeff = 0;
+    initial.derivativeCoeff = 0;
+    initial.feedFwdOffset = 0;
+    initial.feedFwdGain = 0;
+    initial.integralLimit.min = 0;
+    initial.integralLimit.max = 0;
+    initial.outLim.min = 0;
+    initial.outLim.max = 0;
+    initial.slewNeg = 0;
+    initial.slewPos = 0;
+    initial.negativeHysteresis = 0;
+
     std::unique_ptr<PIDController> p = ThermalController::createThermalPid(
-        &z, "therm1", inputs, setpoint, initial, ThermalType::margin);
+        z, "therm1", inputs, setpoint, initial, ThermalType::margin);
     EXPECT_FALSE(p == nullptr);
 
-    EXPECT_CALL(z, getCachedValue(StrEq("fleeting0")))
+    EXPECT_CALL(*z, getCachedValue(StrEq("fleeting0")))
         .Times(3)
         .WillOnce(Return(8.0))
         .WillOnce(Return(13.0))
         .WillOnce(Return(14.0));
 
-    EXPECT_CALL(z, addSetPoint(_, "therm1")).Times(3);
+    EXPECT_CALL(*z, addSetPoint(_, "therm1")).Times(3);
 
     std::vector<double> lastReadings = {8.0, 8.0, 14.0};
     for (auto& reading : lastReadings)
@@ -238,6 +269,8 @@ TEST(ThermalControllerTest, PosHysteresis_BehavesAsExpected)
         p->process();
         EXPECT_EQ(p->getLastInput(), reading);
     }
+
+    delete z;
 }
 
 } // namespace

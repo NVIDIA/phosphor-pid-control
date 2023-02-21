@@ -36,23 +36,11 @@ class DbusPidZone : public ZoneInterface, public ModeObject
 {
   public:
     DbusPidZone(int64_t zone, double minThermalOutput, double failSafePercent,
-<<<<<<< HEAD
-                const SensorManager& mgr, sdbusplus::bus::bus& bus,
-                const char* objPath, bool defer) :
-        ModeObject(bus, objPath,
-                   defer ? ModeObject::action::defer_emit
-                         : ModeObject::action::emit_object_added),
-||||||| a4146eb
-                const SensorManager& mgr, sdbusplus::bus::bus& bus,
-                const char* objPath, bool defer) :
-        ModeObject(bus, objPath, defer),
-=======
                 conf::CycleTime cycleTime, const SensorManager& mgr,
                 sdbusplus::bus_t& bus, const char* objPath, bool defer) :
         ModeObject(bus, objPath,
                    defer ? ModeObject::action::defer_emit
                          : ModeObject::action::emit_object_added),
->>>>>>> origin/master
         _zoneId(zone), _maximumSetPoint(),
         _minThermalOutputSetPt(minThermalOutput),
         _failSafePercent(failSafePercent), _cycleTime(cycleTime), _mgr(mgr)

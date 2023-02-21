@@ -99,6 +99,7 @@ libswampd_sources = [
     'pid/ec/pid.cpp',
     'pid/ec/logging.cpp',
     'pid/ec/stepwise.cpp',
+    'pid/actioncontroller.cpp',
     'pid/fancontroller.cpp',
     'pid/thermalcontroller.cpp',
     'pid/pidcontroller.cpp',

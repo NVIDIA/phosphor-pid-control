@@ -15,6 +15,7 @@
  */
 
 #include "pid.hpp"
+#include <iostream>
 
 #include "../tuning.hpp"
 #include "logging.hpp"
@@ -28,17 +29,17 @@ namespace ec
  *  clamp
  *
  */
-static double clamp(double x, double min, double max)
+static double clamp(double clamp_x, double min, double max)
 {
-    if (x < min)
+    if (clamp_x < min)
     {
         return min;
     }
-    else if (x > max)
+    else if (clamp_x > max)
     {
         return max;
     }
-    return x;
+    return clamp_x;
 }
 
 /********************************
@@ -69,14 +70,14 @@ double pid(pid_info_t* pidinfoptr, double input, double setpoint,
     coreContext.input = input;
     coreContext.setpoint = setpoint;
 
-    double error;
+    double error = 0.0f;
 
-    double proportionalTerm;
+    double proportionalTerm = 0.0f;
     double integralTerm = 0.0f;
     double derivativeTerm = 0.0f;
     double feedFwdTerm = 0.0f;
 
-    double output;
+    double output = 0.0f;
 
     // calculate P, I, D, FF
 

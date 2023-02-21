@@ -27,6 +27,7 @@ class PIDController : public Controller
         _pid_info.ts = static_cast<double>(0.0);
         _pid_info.integral = static_cast<double>(0.0);
         _pid_info.lastOutput = static_cast<double>(0.0);
+        _pid_info.lastError = static_cast<double>(0.0);
         _pid_info.proportionalCoeff = static_cast<double>(0.0);
         _pid_info.integralCoeff = static_cast<double>(0.0);
         _pid_info.feedFwdOffset = static_cast<double>(0.0);
