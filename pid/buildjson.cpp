@@ -62,6 +62,14 @@ void from_json(const json& j, conf::ControllerInfo& c)
         derivativeCoeff->get_to(derivativeCoeffValue);
     }
 
+    auto failSafePercent = j.find("FailSafePercent");
+    auto failSafePercentValue = 0;
+    if (failSafePercent != j.end())
+    {
+        failSafePercent->get_to(failSafePercentValue);
+    }
+    c.failSafePercent = failSafePercentValue;
+
     if (c.type != "stepwise")
     {
         p.at("samplePeriod").get_to(c.pidInfo.ts);
@@ -186,6 +194,12 @@ std::pair<std::map<int64_t, conf::PIDConf>, std::map<int64_t, conf::ZoneConfig>>
         {
             auto name = pid["name"];
             auto item = pid.get<conf::ControllerInfo>();
+
+            if (thisZone.find(name) != thisZone.end())
+            {
+                std::cerr << "Warning: zone " << id
+                          << " have the same pid name " << name << std::endl;
+            }
 
             thisZone[name] = item;
         }

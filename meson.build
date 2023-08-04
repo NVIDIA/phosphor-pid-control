@@ -1,13 +1,15 @@
 project(
     'phosphor-pid-control', 'cpp',
     version : '1.0.0',
-    meson_version: '>=0.63.0',
+    meson_version: '>=1.1.1',
     default_options: [
         'warning_level=3',
         'werror=true',
-        'cpp_std=c++20',
+        'cpp_std=c++23',
     ]
 )
+
+cxx = meson.get_compiler('cpp')
 
 conf_data = configuration_data()
 
@@ -35,7 +37,7 @@ endif
 
 systemd = dependency('systemd')
 systemd_system_unit_dir = systemd.get_variable(
-        pkgconfig: 'systemdsystemunitdir',
+        'systemdsystemunitdir',
         pkgconfig_define: ['prefix', get_option('prefix')])
 
 configure_file(input: 'phosphor-pid-control.service.in',
@@ -50,12 +52,26 @@ sdbusplus_dep = dependency('sdbusplus')
 libsystemd_dep = dependency('libsystemd')
 ipmid_dep = dependency('libipmid')
 
+if cxx.has_header('nlohmann/json.hpp')
+    nlohmann_json_dep = declare_dependency()
+else
+    nlohmann_json_dep = dependency('nlohmann-json')
+endif
+
+if cxx.has_header('CLI/CLI.hpp')
+    CLI11_dep = declare_dependency()
+else
+    CLI11_dep = dependency('CLI11')
+endif
+
 deps = [
+    CLI11_dep,
+    ipmid_dep,
+    libsystemd_dep,
+    nlohmann_json_dep,
     phosphor_dbus_interfaces_dep,
     phosphor_logging_dep,
     sdbusplus_dep,
-    libsystemd_dep,
-    ipmid_dep,
 ]
 
 root_inc = include_directories(

@@ -84,10 +84,10 @@ inline std::string sensorNameToDbusName(const std::string& sensorName)
 std::vector<std::string> getSelectedProfiles(sdbusplus::bus_t& bus)
 {
     std::vector<std::string> ret;
-    auto mapper =
-        bus.new_method_call("xyz.openbmc_project.ObjectMapper",
-                            "/xyz/openbmc_project/object_mapper",
-                            "xyz.openbmc_project.ObjectMapper", "GetSubTree");
+    auto mapper = bus.new_method_call("xyz.openbmc_project.ObjectMapper",
+                                      "/xyz/openbmc_project/object_mapper",
+                                      "xyz.openbmc_project.ObjectMapper",
+                                      "GetSubTree");
     mapper.append("/", 0, std::array<const char*, 1>{thermalControlIface});
     std::unordered_map<
         std::string, std::unordered_map<std::string, std::vector<std::string>>>
@@ -151,7 +151,6 @@ std::vector<std::string> getSelectedProfiles(sdbusplus::bus_t& bus)
 
 int eventHandler(sd_bus_message* m, void* context, sd_bus_error*)
 {
-
     if (context == nullptr || m == nullptr)
     {
         throw std::runtime_error("Invalid match");
@@ -249,6 +248,10 @@ void createMatches(sdbusplus::bus_t& bus, boost::asio::steady_timer& timer)
         "type='signal',member='InterfacesAdded',arg0path='/xyz/openbmc_project/"
         "sensors/'",
         eventHandler, &timer);
+    matches.emplace_back(bus,
+                         "type='signal',member='InterfacesRemoved',arg0path='/"
+                         "xyz/openbmc_project/sensors/'",
+                         eventHandler, &timer);
 }
 
 /**
@@ -278,8 +281,8 @@ inline void getCycleTimeSetting(
     auto findAttributeName = zone.find(attributeName);
     if (findAttributeName != zone.end())
     {
-        double tmpAttributeValue =
-            std::visit(VariantToDoubleVisitor(), zone.at(attributeName));
+        double tmpAttributeValue = std::visit(VariantToDoubleVisitor(),
+                                              zone.at(attributeName));
         if (tmpAttributeValue >= 1.0)
         {
             value = static_cast<uint64_t>(tmpAttributeValue);
@@ -313,6 +316,15 @@ void populatePidInfo(
         info.setpoint = std::visit(VariantToDoubleVisitor(),
                                    getPIDAttribute(base, "SetPoint"));
     }
+
+    int failsafepercent = 0;
+    auto findFailSafe = base.find("FailSafePercent");
+    if (findFailSafe != base.end())
+    {
+        failsafepercent = std::visit(VariantToDoubleVisitor(),
+                                     getPIDAttribute(base, "FailSafePercent"));
+    }
+    info.failSafePercent = failsafepercent;
 
     if (thresholdProperty != nullptr)
     {
@@ -362,10 +374,10 @@ void populatePidInfo(
                                          getPIDAttribute(base, "OutLimitMax"));
     info.pidInfo.outLim.min = std::visit(VariantToDoubleVisitor(),
                                          getPIDAttribute(base, "OutLimitMin"));
-    info.pidInfo.slewNeg =
-        std::visit(VariantToDoubleVisitor(), getPIDAttribute(base, "SlewNeg"));
-    info.pidInfo.slewPos =
-        std::visit(VariantToDoubleVisitor(), getPIDAttribute(base, "SlewPos"));
+    info.pidInfo.slewNeg = std::visit(VariantToDoubleVisitor(),
+                                      getPIDAttribute(base, "SlewNeg"));
+    info.pidInfo.slewPos = std::visit(VariantToDoubleVisitor(),
+                                      getPIDAttribute(base, "SlewPos"));
 
     double negativeHysteresis = 0;
     double positiveHysteresis = 0;
@@ -377,18 +389,18 @@ void populatePidInfo(
 
     if (findNeg != base.end())
     {
-        negativeHysteresis =
-            std::visit(VariantToDoubleVisitor(), findNeg->second);
+        negativeHysteresis = std::visit(VariantToDoubleVisitor(),
+                                        findNeg->second);
     }
     if (findPos != base.end())
     {
-        positiveHysteresis =
-            std::visit(VariantToDoubleVisitor(), findPos->second);
+        positiveHysteresis = std::visit(VariantToDoubleVisitor(),
+                                        findPos->second);
     }
     if (findDerivative != base.end())
     {
-        derivativeCoeff =
-            std::visit(VariantToDoubleVisitor(), findDerivative->second);
+        derivativeCoeff = std::visit(VariantToDoubleVisitor(),
+                                     findDerivative->second);
     }
 
     info.pidInfo.negativeHysteresis = negativeHysteresis;
@@ -401,17 +413,16 @@ bool init(sdbusplus::bus_t& bus, boost::asio::steady_timer& timer,
           std::map<int64_t, conf::PIDConf>& zoneConfig,
           std::map<int64_t, conf::ZoneConfig>& zoneDetailsConfig)
 {
-
     sensorConfig.clear();
     zoneConfig.clear();
     zoneDetailsConfig.clear();
 
     createMatches(bus, timer);
 
-    auto mapper =
-        bus.new_method_call("xyz.openbmc_project.ObjectMapper",
-                            "/xyz/openbmc_project/object_mapper",
-                            "xyz.openbmc_project.ObjectMapper", "GetSubTree");
+    auto mapper = bus.new_method_call("xyz.openbmc_project.ObjectMapper",
+                                      "/xyz/openbmc_project/object_mapper",
+                                      "xyz.openbmc_project.ObjectMapper",
+                                      "GetSubTree");
     mapper.append("/", 0,
                   std::array<const char*, 6>{
                       objectManagerInterface, pidConfigurationInterface,
@@ -448,7 +459,6 @@ bool init(sdbusplus::bus_t& bus, boost::asio::steady_timer& timer,
             auto& owner = owners[ownerPair.first];
             for (const std::string& interface : ownerPair.second)
             {
-
                 if (interface == objectManagerInterface)
                 {
                     owner.second = objectPair.first;
@@ -619,8 +629,15 @@ bool init(sdbusplus::bus_t& bus, boost::asio::steady_timer& timer,
 
             details.minThermalOutput = std::visit(VariantToDoubleVisitor(),
                                                   zone.at("MinThermalOutput"));
-            details.failsafePercent = std::visit(VariantToDoubleVisitor(),
-                                                 zone.at("FailSafePercent"));
+
+            int failsafepercent = 0;
+            auto findFailSafe = zone.find("FailSafePercent");
+            if (findFailSafe != zone.end())
+            {
+                failsafepercent = std::visit(VariantToDoubleVisitor(),
+                                             zone.at("FailSafePercent"));
+            }
+            details.failsafePercent = failsafepercent;
 
             getCycleTimeSetting(zone, index, "CycleIntervalTimeMS",
                                 details.cycleTime.cycleIntervalTimeMS);
@@ -633,7 +650,8 @@ bool init(sdbusplus::bus_t& bus, boost::asio::steady_timer& timer,
         {
             const auto& base =
                 configuration.second.at(pidConfigurationInterface);
-            const std::string pidName = std::get<std::string>(base.at("Name"));
+            const std::string pidName =
+                sensorNameToDbusName(std::get<std::string>(base.at("Name")));
             const std::string pidClass =
                 std::get<std::string>(base.at("Class"));
             const std::vector<std::string>& zones =
@@ -832,8 +850,7 @@ bool init(sdbusplus::bus_t& bus, boost::asio::steady_timer& timer,
 
                 if (offsetType.empty())
                 {
-                    conf::ControllerInfo& info =
-                        conf[std::get<std::string>(base.at("Name"))];
+                    conf::ControllerInfo& info = conf[pidName];
                     info.inputs = std::move(inputSensorNames);
                     populatePidInfo(bus, base, info, nullptr, sensorConfig);
                 }
@@ -856,6 +873,8 @@ bool init(sdbusplus::bus_t& bus, boost::asio::steady_timer& timer,
         if (findStepwise != configuration.second.end())
         {
             const auto& base = findStepwise->second;
+            const std::string pidName =
+                sensorNameToDbusName(std::get<std::string>(base.at("Name")));
             const std::vector<std::string>& zones =
                 std::get<std::vector<std::string>>(base.at("Zones"));
             for (const std::string& zone : zones)
@@ -912,8 +931,7 @@ bool init(sdbusplus::bus_t& bus, boost::asio::steady_timer& timer,
                 {
                     continue;
                 }
-                conf::ControllerInfo& info =
-                    conf[std::get<std::string>(base.at("Name"))];
+                conf::ControllerInfo& info = conf[pidName];
                 info.inputs = std::move(inputs);
 
                 info.type = "stepwise";

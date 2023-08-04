@@ -61,9 +61,7 @@ std::map<int64_t, conf::ZoneConfig> zoneDetailsConfig = {};
 
 } // namespace pid_control
 
-/** the swampd daemon will check for the existence of this file. */
-constexpr auto jsonConfigurationPath = "/usr/share/swampd/config.json";
-std::string configPath = "";
+std::filesystem::path configPath = "";
 
 /* async io context for operation */
 boost::asio::io_context io;
@@ -79,6 +77,24 @@ static sdbusplus::asio::connection
 
 namespace pid_control
 {
+
+std::filesystem::path searchConfigurationPath()
+{
+    static constexpr auto name = "config.json";
+
+    for (auto pathSeg : {std::filesystem::current_path(),
+                         std::filesystem::path{"/var/lib/swampd"},
+                         std::filesystem::path{"/usr/share/swampd"}})
+    {
+        auto file = pathSeg / name;
+        if (std::filesystem::exists(file))
+        {
+            return file;
+        }
+    }
+
+    return name;
+}
 
 void restartControlLoops()
 {
@@ -101,8 +117,8 @@ void restartControlLoops()
     zones.clear();
     isCanceling = false;
 
-    const std::string& path =
-        (configPath.length() > 0) ? configPath : jsonConfigurationPath;
+    const std::filesystem::path path =
+        (!configPath.empty()) ? configPath : searchConfigurationPath();
 
     if (std::filesystem::exists(path))
     {
@@ -114,8 +130,8 @@ void restartControlLoops()
         {
             auto jsonData = parseValidateJson(path);
             sensorConfig = buildSensorsFromJson(jsonData);
-            std::tie(zoneConfig, zoneDetailsConfig) =
-                buildPIDsFromJson(jsonData);
+            std::tie(zoneConfig,
+                     zoneDetailsConfig) = buildPIDsFromJson(jsonData);
         }
         catch (const std::exception& e)
         {
@@ -153,17 +169,8 @@ void restartControlLoops()
 
 void tryRestartControlLoops(bool first)
 {
-    static int count = 0;
     static const auto delayTime = std::chrono::seconds(10);
     static boost::asio::steady_timer timer(io);
-    // try to start a control loop while the loop has been scheduled.
-    if (first && count != 0)
-    {
-        std::cerr
-            << "ControlLoops has been scheduled, refresh the loop count\n";
-        count = 1;
-        return;
-    }
 
     auto restartLbd = [](const boost::system::error_code& error) {
         if (error == boost::asio::error::operation_aborted)
@@ -171,31 +178,19 @@ void tryRestartControlLoops(bool first)
             return;
         }
 
-        // for the last loop, don't elminate the failure of restartControlLoops.
-        if (count >= 5)
-        {
-            restartControlLoops();
-            // reset count after succesful restartControlLoops()
-            count = 0;
-            return;
-        }
-
         // retry when restartControlLoops() has some failure.
         try
         {
             restartControlLoops();
-            // reset count after succesful restartControlLoops()
-            count = 0;
         }
         catch (const std::exception& e)
         {
-            std::cerr << count
-                      << " Failed during restartControlLoops, try again: "
+            std::cerr << "Failed during restartControlLoops, try again: "
                       << e.what() << "\n";
             tryRestartControlLoops(false);
         }
     };
-    count++;
+
     // first time of trying to restart the control loop without a delay
     if (first)
     {
@@ -291,6 +286,10 @@ int main(int argc, char* argv[])
         if (std::filesystem::exists(altPath))
         {
             loggingPath = altPath;
+        }
+        else
+        {
+            loggingPath = defLoggingPath;
         }
 
         loggingEnabled = true;

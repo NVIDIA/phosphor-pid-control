@@ -104,6 +104,12 @@ int64_t DbusPidZone::getZoneID(void) const
 
 void DbusPidZone::addSetPoint(double setPoint, const std::string& name)
 {
+    /* exclude disabled pidloop from _maximumSetPoint calculation*/
+    if (!isPidProcessEnabled(name))
+    {
+        return;
+    }
+
     _SetPoints.push_back(setPoint);
     /*
      * if there are multiple thermal controllers with the same
@@ -130,6 +136,7 @@ void DbusPidZone::clearSetPoints(void)
 {
     _SetPoints.clear();
     _maximumSetPoint = 0;
+    _maximumSetPointName.clear();
 }
 
 double DbusPidZone::getFailSafePercent(void) const
@@ -265,7 +272,7 @@ void DbusPidZone::determineMaxSetPointRequest(void)
     if (minThermalThreshold >= _maximumSetPoint)
     {
         _maximumSetPoint = minThermalThreshold;
-        _maximumSetPointName = "";
+        _maximumSetPointName = "Minimum";
     }
     else if (_maximumSetPointName.compare(_maximumSetPointNamePrev))
     {
@@ -351,7 +358,7 @@ void DbusPidZone::updateFanTelemetry(void)
      * is disabled?  I think it's a waste to try and log things even if the
      * data is just being dropped though.
      */
-    tstamp now = std::chrono::high_resolution_clock::now();
+    const auto now = std::chrono::high_resolution_clock::now();
     if (loggingEnabled)
     {
         _log << std::chrono::duration_cast<std::chrono::milliseconds>(
@@ -361,67 +368,7 @@ void DbusPidZone::updateFanTelemetry(void)
         _log << "," << _maximumSetPointName;
     }
 
-    for (const auto& f : _fanInputs)
-    {
-        auto sensor = _mgr.getSensor(f);
-        ReadReturn r = sensor->read();
-        _cachedValuesByName[f] = {r.value, r.unscaled};
-        int64_t timeout = sensor->getTimeout();
-        tstamp then = r.updated;
-
-        auto duration =
-            std::chrono::duration_cast<std::chrono::seconds>(now - then)
-                .count();
-        auto period = std::chrono::seconds(timeout).count();
-        /*
-         * TODO(venture): We should check when these were last read.
-         * However, these are the fans, so if I'm not getting updated values
-         * for them... what should I do?
-         */
-        if (loggingEnabled)
-        {
-            const auto& v = _cachedValuesByName[f];
-            _log << "," << v.scaled << "," << v.unscaled;
-            const auto& p = _cachedFanOutputs[f];
-            _log << "," << p.scaled << "," << p.unscaled;
-        }
-
-        if (debugEnabled)
-        {
-            std::cerr << f << " fan sensor reading: " << r.value << "\n";
-        }
-
-        // check if fan fail.
-        if (sensor->getFailed())
-        {
-            _failSafeSensors.insert(f);
-            if (debugEnabled)
-            {
-                std::cerr << f << " fan sensor get failed\n";
-            }
-        }
-        else if (timeout != 0 && duration >= period)
-        {
-            _failSafeSensors.insert(f);
-            if (debugEnabled)
-            {
-                std::cerr << f << " fan sensor timeout\n";
-            }
-        }
-        else
-        {
-            // Check if it's in there: remove it.
-            auto kt = _failSafeSensors.find(f);
-            if (kt != _failSafeSensors.end())
-            {
-                if (debugEnabled)
-                {
-                    std::cerr << f << " is erased from failsafe sensor set\n";
-                }
-                _failSafeSensors.erase(kt);
-            }
-        }
-    }
+    processSensorInputs</* fanSensorLogging */ true>(_fanInputs, now);
 
     if (loggingEnabled)
     {
@@ -437,6 +384,7 @@ void DbusPidZone::updateFanTelemetry(void)
 
 void DbusPidZone::updateSensors(void)
 {
+<<<<<<< HEAD
     using namespace std::chrono;
     /* margin and temp are stored as temp */
     tstamp now = high_resolution_clock::now();
@@ -495,6 +443,64 @@ void DbusPidZone::updateSensors(void)
             }
         }
     }
+||||||| 10e46ef
+    using namespace std::chrono;
+    /* margin and temp are stored as temp */
+    tstamp now = high_resolution_clock::now();
+
+    for (const auto& t : _thermalInputs)
+    {
+        auto sensor = _mgr.getSensor(t);
+        ReadReturn r = sensor->read();
+        int64_t timeout = sensor->getTimeout();
+
+        _cachedValuesByName[t] = {r.value, r.unscaled};
+        tstamp then = r.updated;
+
+        auto duration = duration_cast<std::chrono::seconds>(now - then).count();
+        auto period = std::chrono::seconds(timeout).count();
+
+        if (debugEnabled)
+        {
+            std::cerr << t << " temperature sensor reading: " << r.value
+                      << "\n";
+        }
+
+        if (sensor->getFailed())
+        {
+            _failSafeSensors.insert(t);
+            if (debugEnabled)
+            {
+                std::cerr << t << " temperature sensor get failed\n";
+            }
+        }
+        else if (timeout != 0 && duration >= period)
+        {
+            // std::cerr << "Entering fail safe mode.\n";
+            _failSafeSensors.insert(t);
+            if (debugEnabled)
+            {
+                std::cerr << t << " temperature sensor get timeout\n";
+            }
+        }
+        else
+        {
+            // Check if it's in there: remove it.
+            auto kt = _failSafeSensors.find(t);
+            if (kt != _failSafeSensors.end())
+            {
+                if (debugEnabled)
+                {
+                    std::cerr << t << " is erased from failsafe sensor set\n";
+                }
+                _failSafeSensors.erase(kt);
+            }
+        }
+    }
+=======
+    processSensorInputs</* fanSensorLogging */ false>(
+        _thermalInputs, std::chrono::high_resolution_clock::now());
+>>>>>>> origin/master
 
     return;
 }
@@ -517,6 +523,8 @@ void DbusPidZone::initializeCache(void)
         // Start all sensors in fail-safe mode.
         _failSafeSensors.insert(t);
     }
+    // Initialize Pid FailSafePercent
+    initPidFailSafePercent();
 }
 
 void DbusPidZone::dumpCache(void)
@@ -578,6 +586,52 @@ bool DbusPidZone::manual(bool value)
 bool DbusPidZone::failSafe() const
 {
     return getFailSafeMode();
+}
+
+void DbusPidZone::addPidControlProcess(std::string name, sdbusplus::bus_t& bus,
+                                       std::string objPath, bool defer)
+{
+    _pidsControlProcess[name] = std::make_unique<ProcessObject>(
+        bus, objPath.c_str(),
+        defer ? ProcessObject::action::defer_emit
+              : ProcessObject::action::emit_object_added);
+    // Default enable setting = true
+    _pidsControlProcess[name]->enabled(true);
+}
+
+bool DbusPidZone::isPidProcessEnabled(std::string name)
+{
+    return _pidsControlProcess[name]->enabled();
+}
+
+void DbusPidZone::initPidFailSafePercent(void)
+{
+    // Currently, find the max failsafe percent pwm settings from zone and
+    // controller, and assign it to zone failsafe percent.
+
+    _failSafePercent = _zoneFailSafePercent;
+    std::cerr << "zone: Zone" << _zoneId
+              << " zoneFailSafePercent: " << _zoneFailSafePercent << "\n";
+
+    for (const auto& [name, value] : _pidsFailSafePercent)
+    {
+        _failSafePercent = std::max(_failSafePercent, value);
+        std::cerr << "pid: " << name << " failSafePercent: " << value << "\n";
+    }
+
+    // when the final failsafe percent is zero , it indicate no failsafe
+    // percent is configured  , set it to 100% as the default setting.
+    if (_failSafePercent == 0)
+    {
+        _failSafePercent = 100;
+    }
+    std::cerr << "Final zone" << _zoneId
+              << " failSafePercent: " << _failSafePercent << "\n";
+}
+
+void DbusPidZone::addPidFailSafePercent(std::string name, double percent)
+{
+    _pidsFailSafePercent[name] = percent;
 }
 
 } // namespace pid_control

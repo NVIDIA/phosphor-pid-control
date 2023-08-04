@@ -92,7 +92,7 @@ DbusPassive::DbusPassive(
     const SensorProperties& settings, bool failed, const std::string& path,
     const std::shared_ptr<DbusPassiveRedundancy>& redundancy) :
     ReadInterface(),
-    _signal(bus, getMatch(path).c_str(), dbusHandleSignal, this), _id(id),
+    _signal(bus, getMatch(path), dbusHandleSignal, this), _id(id),
     _helper(std::move(helper)), _failed(failed), path(path),
     redundancy(redundancy)
 
@@ -275,8 +275,8 @@ int handleSensorValue(sdbusplus::message_t& msg, DbusPassive* owner)
         auto valPropMap = msgData.find("Value");
         if (valPropMap != msgData.end())
         {
-            double value =
-                std::visit(VariantToDoubleVisitor(), valPropMap->second);
+            double value = std::visit(VariantToDoubleVisitor(),
+                                      valPropMap->second);
 
             owner->updateValue(value, false);
         }
