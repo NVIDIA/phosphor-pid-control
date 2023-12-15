@@ -42,7 +42,8 @@ unittest_source = {
                               '../dbus/dbusutil.cpp'],
     'dbus_util_unittest': ['../dbus/dbusutil.cpp'],
     'json_parse_unittest': ['../buildjson/buildjson.cpp'],
-    'pid_json_unittest': ['../pid/buildjson.cpp'],
+    'pid_json_unittest': ['../pid/buildjson.cpp',
+                          '../util.cpp'],
     'pid_fancontroller_unittest': ['../pid/ec/pid.cpp',
                                    '../pid/ec/logging.cpp',
                                    '../pid/fancontroller.cpp',
@@ -81,7 +82,7 @@ foreach t : unit_tests
                            swampd_sources,
                        ],
                        link_args: dynamic_linker,
-                       build_rpath: get_option('oe-sdk').enabled() ? rpath : '',
+                       build_rpath: get_option('oe-sdk').allowed() ? rpath : '',
                        dependencies: [
                            gtest,
                            gmock,

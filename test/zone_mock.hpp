@@ -23,8 +23,7 @@ class ZoneMock : public ZoneInterface
     ValueCacheEntry getCachedValues(const std::string& s)
     {
         auto v = getCachedValue(s);
-        ValueCacheEntry ret = {v, v};
-        return ret;
+        return {v, v};
     }
 
     MOCK_CONST_METHOD0(getRedundantWrite, bool(void));
@@ -52,6 +51,10 @@ class ZoneMock : public ZoneInterface
 
     MOCK_METHOD0(initializeLog, void());
     MOCK_METHOD1(writeLog, void(const std::string&));
+
+    MOCK_METHOD4(updateThermalPowerDebugInterface,
+                 void(std::string pidName, std::string leader, double input,
+                      double output));
 };
 
 } // namespace pid_control

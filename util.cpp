@@ -69,7 +69,12 @@ void debugPrint(const std::map<std::string, conf::SensorConfig>& sensorConfig,
             std::cout << "\t\t\t{";
             for (const auto& input : pidconf.second.inputs)
             {
-                std::cout << "\n\t\t\t" << input << ",\n";
+                std::cout << "\n\t\t\t" << input.name;
+                if (input.convertTempToMargin)
+                {
+                    std::cout << "[" << input.convertMarginZero << "]";
+                }
+                std::cout << ",\n";
             }
             std::cout << "\t\t\t}\n";
             std::cout << "\t\t\t" << pidconf.second.setpoint << ",\n";
@@ -94,6 +99,71 @@ void debugPrint(const std::map<std::string, conf::SensorConfig>& sensorConfig,
         std::cout << "\t},\n";
     }
     std::cout << "}\n\n";
+}
+
+std::vector<conf::SensorInput>
+    spliceInputs(const std::vector<std::string>& inputNames,
+                 const std::vector<double>& inputTempToMargin,
+                 const std::vector<std::string>& missingAcceptableNames)
+{
+    std::vector<conf::SensorInput> results;
+
+    // Default to TempToMargin and MissingIsAcceptable disabled
+    for (const auto& inputName : inputNames)
+    {
+        conf::SensorInput newInput{
+            inputName, std::numeric_limits<double>::quiet_NaN(), false, false};
+
+        results.emplace_back(newInput);
+    }
+
+    size_t resultSize = results.size();
+    size_t marginSize = inputTempToMargin.size();
+
+    for (size_t index = 0; index < resultSize; ++index)
+    {
+        // If fewer doubles than strings, and vice versa, ignore remainder
+        if (index >= marginSize)
+        {
+            break;
+        }
+
+        // Both vectors have this index, combine both into SensorInput
+        results[index].convertMarginZero = inputTempToMargin[index];
+        results[index].convertTempToMargin = true;
+    }
+
+    std::set<std::string> acceptableSet;
+
+    // Copy vector to set, to avoid O(n^2) runtime below
+    for (const auto& name : missingAcceptableNames)
+    {
+        acceptableSet.emplace(name);
+    }
+
+    // Flag missingIsAcceptable true if name found in that set
+    for (auto& result : results)
+    {
+        if (acceptableSet.find(result.name) != acceptableSet.end())
+        {
+            result.missingIsAcceptable = true;
+        }
+    }
+
+    return results;
+}
+
+std::vector<std::string>
+    splitNames(const std::vector<conf::SensorInput>& sensorInputs)
+{
+    std::vector<std::string> results;
+
+    for (const auto& sensorInput : sensorInputs)
+    {
+        results.emplace_back(sensorInput.name);
+    }
+
+    return results;
 }
 
 } // namespace pid_control

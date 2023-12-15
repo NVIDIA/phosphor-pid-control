@@ -97,6 +97,17 @@ bool DbusPidZone::getFailSafeMode(void) const
     return !_failSafeSensors.empty();
 }
 
+void DbusPidZone::markSensorMissing(const std::string& name)
+{
+    if (_missingAcceptable.find(name) != _missingAcceptable.end())
+    {
+        // Disallow sensors in MissingIsAcceptable list from causing failsafe
+        return;
+    }
+
+    _failSafeSensors.emplace(name);
+}
+
 int64_t DbusPidZone::getZoneID(void) const
 {
     return _zoneId;
@@ -185,14 +196,25 @@ void DbusPidZone::setOutputCache(std::string_view name,
     _cachedFanOutputs[std::string{name}] = values;
 }
 
-void DbusPidZone::addFanInput(const std::string& fan)
+void DbusPidZone::addFanInput(const std::string& fan, bool missingAcceptable)
 {
     _fanInputs.push_back(fan);
+
+    if (missingAcceptable)
+    {
+        _missingAcceptable.emplace(fan);
+    }
 }
 
-void DbusPidZone::addThermalInput(const std::string& therm)
+void DbusPidZone::addThermalInput(const std::string& therm,
+                                  bool missingAcceptable)
 {
     _thermalInputs.push_back(therm);
+
+    if (missingAcceptable)
+    {
+        _missingAcceptable.emplace(therm);
+    }
 }
 
 // Updates desired RPM setpoint from optional text file
@@ -384,144 +406,31 @@ void DbusPidZone::updateFanTelemetry(void)
 
 void DbusPidZone::updateSensors(void)
 {
-<<<<<<< HEAD
-    using namespace std::chrono;
-    /* margin and temp are stored as temp */
-    tstamp now = high_resolution_clock::now();
-
-    for (const auto& t : _thermalInputs)
-    {
-        auto sensor = _mgr.getSensor(t);
-        ReadReturn r = sensor->read();
-        int64_t timeout = sensor->getTimeout();
-
-        _cachedValuesByName[t] = {r.value, r.unscaled};
-        tstamp then = r.updated;
-        std::string sensorName = sensor->getName();
-        double setpoint = processThermalAction(sensorName);
-        if (setpoint > 0)
-        {
-            DbusPidZone::addSetPoint(setpoint,sensorName);
-        }
-        auto duration = duration_cast<std::chrono::seconds>(now - then).count();
-        auto period = std::chrono::seconds(timeout).count();
-
-        if (debugEnabled)
-        {
-            std::cerr << t << " temperature sensor reading: " << r.value
-                      << "\n";
-        }
-
-        if (sensor->getFailed())
-        {
-            _failSafeSensors.insert(t);
-            if (debugEnabled)
-            {
-                std::cerr << t << " temperature sensor get failed\n";
-            }
-        }
-        else if (timeout != 0 && duration >= period)
-        {
-            // std::cerr << "Entering fail safe mode.\n";
-            _failSafeSensors.insert(t);
-            if (debugEnabled)
-            {
-                std::cerr << t << " temperature sensor get timeout\n";
-            }
-        }
-        else
-        {
-            // Check if it's in there: remove it.
-            auto kt = _failSafeSensors.find(t);
-            if (kt != _failSafeSensors.end())
-            {
-                if (debugEnabled)
-                {
-                    std::cerr << t << " is erased from failsafe sensor set\n";
-                }
-                _failSafeSensors.erase(kt);
-            }
-        }
-    }
-||||||| 10e46ef
-    using namespace std::chrono;
-    /* margin and temp are stored as temp */
-    tstamp now = high_resolution_clock::now();
-
-    for (const auto& t : _thermalInputs)
-    {
-        auto sensor = _mgr.getSensor(t);
-        ReadReturn r = sensor->read();
-        int64_t timeout = sensor->getTimeout();
-
-        _cachedValuesByName[t] = {r.value, r.unscaled};
-        tstamp then = r.updated;
-
-        auto duration = duration_cast<std::chrono::seconds>(now - then).count();
-        auto period = std::chrono::seconds(timeout).count();
-
-        if (debugEnabled)
-        {
-            std::cerr << t << " temperature sensor reading: " << r.value
-                      << "\n";
-        }
-
-        if (sensor->getFailed())
-        {
-            _failSafeSensors.insert(t);
-            if (debugEnabled)
-            {
-                std::cerr << t << " temperature sensor get failed\n";
-            }
-        }
-        else if (timeout != 0 && duration >= period)
-        {
-            // std::cerr << "Entering fail safe mode.\n";
-            _failSafeSensors.insert(t);
-            if (debugEnabled)
-            {
-                std::cerr << t << " temperature sensor get timeout\n";
-            }
-        }
-        else
-        {
-            // Check if it's in there: remove it.
-            auto kt = _failSafeSensors.find(t);
-            if (kt != _failSafeSensors.end())
-            {
-                if (debugEnabled)
-                {
-                    std::cerr << t << " is erased from failsafe sensor set\n";
-                }
-                _failSafeSensors.erase(kt);
-            }
-        }
-    }
-=======
     processSensorInputs</* fanSensorLogging */ false>(
         _thermalInputs, std::chrono::high_resolution_clock::now());
->>>>>>> origin/master
 
     return;
 }
 
 void DbusPidZone::initializeCache(void)
 {
+    auto nan = std::numeric_limits<double>::quiet_NaN();
+
     for (const auto& f : _fanInputs)
     {
-        _cachedValuesByName[f] = {0, 0};
-        _cachedFanOutputs[f] = {0, 0};
+        _cachedValuesByName[f] = {nan, nan};
+        _cachedFanOutputs[f] = {nan, nan};
 
         // Start all fans in fail-safe mode.
-        _failSafeSensors.insert(f);
+        markSensorMissing(f);
     }
 
     for (const auto& t : _thermalInputs)
     {
-        _cachedValuesByName[t] = {0, 0};
+        _cachedValuesByName[t] = {nan, nan};
 
         // Start all sensors in fail-safe mode.
-        _failSafeSensors.insert(t);
+        markSensorMissing(t);
     }
     // Initialize Pid FailSafePercent
     initPidFailSafePercent();
@@ -588,7 +497,8 @@ bool DbusPidZone::failSafe() const
     return getFailSafeMode();
 }
 
-void DbusPidZone::addPidControlProcess(std::string name, sdbusplus::bus_t& bus,
+void DbusPidZone::addPidControlProcess(std::string name, std::string type,
+                                       double setpoint, sdbusplus::bus_t& bus,
                                        std::string objPath, bool defer)
 {
     _pidsControlProcess[name] = std::make_unique<ProcessObject>(
@@ -597,6 +507,24 @@ void DbusPidZone::addPidControlProcess(std::string name, sdbusplus::bus_t& bus,
               : ProcessObject::action::emit_object_added);
     // Default enable setting = true
     _pidsControlProcess[name]->enabled(true);
+    _pidsControlProcess[name]->setpoint(setpoint);
+
+    if (type == "temp")
+    {
+        _pidsControlProcess[name]->classType("Temperature");
+    }
+    else if (type == "margin")
+    {
+        _pidsControlProcess[name]->classType("Margin");
+    }
+    else if (type == "power")
+    {
+        _pidsControlProcess[name]->classType("Power");
+    }
+    else if (type == "powersum")
+    {
+        _pidsControlProcess[name]->classType("PowerSum");
+    }
 }
 
 bool DbusPidZone::isPidProcessEnabled(std::string name)
@@ -632,6 +560,26 @@ void DbusPidZone::initPidFailSafePercent(void)
 void DbusPidZone::addPidFailSafePercent(std::string name, double percent)
 {
     _pidsFailSafePercent[name] = percent;
+}
+
+std::string DbusPidZone::leader() const
+{
+    return _maximumSetPointName;
+}
+
+void DbusPidZone::updateThermalPowerDebugInterface(std::string pidName,
+                                                   std::string leader,
+                                                   double input, double output)
+{
+    if (leader.empty())
+    {
+        _pidsControlProcess[pidName]->output(output);
+    }
+    else
+    {
+        _pidsControlProcess[pidName]->leader(leader);
+        _pidsControlProcess[pidName]->input(input);
+    }
 }
 
 } // namespace pid_control

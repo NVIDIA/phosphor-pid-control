@@ -3,12 +3,14 @@
 #include "pid/ec/pid.hpp"
 #include "pid/ec/stepwise.hpp"
 
+#include <limits>
 #include <map>
 #include <string>
 #include <vector>
 
 namespace pid_control
 {
+
 namespace conf
 {
 
@@ -31,12 +33,27 @@ struct SensorConfig
 };
 
 /*
+ * Structure for decorating an input sensor's name with additional
+ * information, such as TempToMargin and MissingIsAcceptable.
+ * This information comes from the PID loop configuration,
+ * not from SensorConfig, in order for it to be able to work
+ * with dynamic sensors from entity-manager.
+ */
+struct SensorInput
+{
+    std::string name;
+    double convertMarginZero = std::numeric_limits<double>::quiet_NaN();
+    bool convertTempToMargin = false;
+    bool missingIsAcceptable = false;
+};
+
+/*
  * Structure for holding the configuration of a PID.
  */
 struct ControllerInfo
 {
     std::string type;                // fan or margin or temp?
-    std::vector<std::string> inputs; // one or more sensors.
+    std::vector<SensorInput> inputs; // one or more sensors.
     double setpoint;                 // initial setpoint for thermal.
     ec::pidinfo pidInfo;             // pid details
     ec::StepwiseInfo stepwiseInfo;
@@ -74,4 +91,5 @@ using PIDConf = std::map<std::string, ControllerInfo>;
 constexpr bool DEBUG = false; // enable to print found configuration
 
 } // namespace conf
+
 } // namespace pid_control

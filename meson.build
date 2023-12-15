@@ -22,7 +22,7 @@ configure_file(output: 'config.h',
     configuration: conf_data
 )
 
-if get_option('oe-sdk').enabled()
+if get_option('oe-sdk').allowed()
     OECORE_TARGET_SYSROOT = run_command('sh', '-c', 'echo $OECORE_TARGET_SYSROOT').stdout().strip()
     if OECORE_TARGET_SYSROOT == ''
         error('OECORE_TARGET_SYSROOT must be set with enable oe-sdk')
@@ -46,17 +46,13 @@ configure_file(input: 'phosphor-pid-control.service.in',
                install: true,
                install_dir: systemd_system_unit_dir)
 
+nlohmann_json_dep = dependency('nlohmann_json', include_type: 'system')
 phosphor_dbus_interfaces_dep = dependency('phosphor-dbus-interfaces')
 phosphor_logging_dep = dependency('phosphor-logging')
 sdbusplus_dep = dependency('sdbusplus')
 libsystemd_dep = dependency('libsystemd')
 ipmid_dep = dependency('libipmid')
 
-if cxx.has_header('nlohmann/json.hpp')
-    nlohmann_json_dep = declare_dependency()
-else
-    nlohmann_json_dep = dependency('nlohmann-json')
-endif
 
 if cxx.has_header('CLI/CLI.hpp')
     CLI11_dep = declare_dependency()
