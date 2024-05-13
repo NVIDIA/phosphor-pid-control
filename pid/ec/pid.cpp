@@ -15,10 +15,11 @@
  */
 
 #include "pid.hpp"
-#include <iostream>
 
 #include "../tuning.hpp"
 #include "logging.hpp"
+
+#include <iostream>
 
 namespace pid_control
 {
