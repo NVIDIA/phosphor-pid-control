@@ -213,6 +213,7 @@ TEST(ThermalControllerTest, NegHysteresis_BehavesAsExpected)
     std::vector<pid_control::conf::SensorInput> inputs = {{"fleeting0"}};
     double setpoint = 10.0;
     ec::pidinfo initial;
+    initial.checkHysterWithSetpt = false;
     initial.negativeHysteresis = 4.0;
     initial.ts = 0;
     initial.proportionalCoeff = 0;
@@ -261,6 +262,7 @@ TEST(ThermalControllerTest, PosHysteresis_BehavesAsExpected)
     std::vector<pid_control::conf::SensorInput> inputs = {{"fleeting0"}};
     double setpoint = 10.0;
     ec::pidinfo initial;
+    initial.checkHysterWithSetpt = false;
     initial.positiveHysteresis = 5.0;
 
     initial.ts = 0;

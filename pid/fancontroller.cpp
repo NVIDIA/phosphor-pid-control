@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+#include "config.h"
 
 #include "fancontroller.hpp"
 
@@ -130,7 +131,16 @@ void FanController::outputProc(double value)
     /* If doing tuning, don't go into failsafe mode. */
     if (!tuningEnabled)
     {
-        if (_owner->getFailSafeMode())
+        bool failsafeCurrState = _owner->getFailSafeMode();
+
+        // Note when failsafe state transitions happen
+        if (failsafePrevState != failsafeCurrState)
+        {
+            failsafePrevState = failsafeCurrState;
+            failsafeTransition = true;
+        }
+
+        if (failsafeCurrState)
         {
             double failsafePercent = _owner->getFailSafePercent();
 
@@ -147,23 +157,36 @@ void FanController::outputProc(double value)
             {
                 percent = failsafePercent;
             }
-
-            if (failsafePrint || debugEnabled)
-            {
-                std::cerr << "Zone " << _owner->getZoneID()
-                          << " fans output failsafe pwm: " << percent << "\n";
-                failsafePrint = false;
-            }
 #endif
+        }
+
+        // Always print if debug enabled
+        if (debugEnabled)
+        {
+            std::cerr << "Zone " << _owner->getZoneID() << " fans, "
+                      << (failsafeCurrState ? "failsafe" : "normal")
+                      << " mode, output pwm: " << percent << "\n";
         }
         else
         {
-            failsafePrint = true;
-            if (debugEnabled)
+            // Only print once per transition when not debugging
+            if (failsafeTransition)
             {
-                std::cerr << "Zone " << _owner->getZoneID()
-                          << " fans output pwm: " << percent << "\n";
+                failsafeTransition = false;
+                std::cerr << "Zone " << _owner->getZoneID() << " fans, "
+                          << (failsafeCurrState ? "entering failsafe"
+                                                : "returning to normal")
+                          << " mode, output pwm: " << percent << "\n";
             }
+        }
+    }
+    else
+    {
+        if (debugEnabled)
+        {
+            std::cerr << "Zone " << _owner->getZoneID()
+                      << " fans, tuning mode, bypassing failsafe, output pwm: "
+                      << percent << "\n";
         }
     }
 
@@ -186,6 +209,36 @@ void FanController::outputProc(double value)
     }
 
     return;
+}
+
+FanController::~FanController()
+{
+#ifdef OFFLINE_FAILSAFE_PWM
+    double percent = _owner->getFailSafePercent();
+    if (debugEnabled)
+    {
+        std::cerr << "Zone " << _owner->getZoneID()
+                  << " offline fans output pwm: " << percent << "\n";
+    }
+
+    // value and kFanFailSafeDutyCycle are 10 for 10% so let's fix that.
+    percent /= 100.0;
+
+    // PidSensorMap for writing.
+    for (const auto& it : _inputs)
+    {
+        auto sensor = _owner->getSensor(it);
+        auto redundantWrite = _owner->getRedundantWrite();
+        int64_t rawWritten;
+        sensor->write(percent, redundantWrite, &rawWritten);
+
+        // The outputCache will be used later,
+        // to store a record of the PWM commanded,
+        // so that this information can be included during logging.
+        auto unscaledWritten = static_cast<double>(rawWritten);
+        _owner->setOutputCache(sensor->getName(), {percent, unscaledWritten});
+    }
+#endif
 }
 
 } // namespace pid_control
