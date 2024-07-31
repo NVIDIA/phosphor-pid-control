@@ -102,10 +102,10 @@ inline void poweroff(std::shared_ptr<sdbusplus::asio::connection> conn)
 inline std::string getService(const std::string& intf, const std::string& path)
 {
     auto bus = bus::new_default_system();
-    auto mapper =
-        bus.new_method_call("xyz.openbmc_project.ObjectMapper",
-                            "/xyz/openbmc_project/object_mapper",
-                            "xyz.openbmc_project.ObjectMapper", "GetObject");
+    auto mapper = bus.new_method_call("xyz.openbmc_project.ObjectMapper",
+                                      "/xyz/openbmc_project/object_mapper",
+                                      "xyz.openbmc_project.ObjectMapper",
+                                      "GetObject");
 
     mapper.append(path);
     mapper.append(std::vector<std::string>({intf}));

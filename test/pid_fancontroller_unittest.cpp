@@ -155,17 +155,18 @@ TEST(FanControllerTest, OutputProc_VerifiesIfFailsafeEnabledInputIsIgnored)
     // is below the failsafe minimum value, the input is not used and the fans
     // are driven at failsafe RPM (this assumes STRICT_FAILSAFE_PWM is not set)
 
-    ZoneMock* z = new ZoneMock();;
+    ZoneMock* z = new ZoneMock();
+    ;
 
     std::vector<std::string> inputs = {"fan0", "fan1"};
     ec::pidinfo initial;
 
-    initial.ts = 0;                  // sample time in seconds
-    initial.proportionalCoeff = 0;   // coeff for P
-    initial.integralCoeff = 0;       // coeff for I
-    initial.derivativeCoeff = 0;     // coeff for D
-    initial.feedFwdOffset = 0;       // offset coeff for feed-forward term
-    initial.feedFwdGain = 0;         // gain for feed-forward term
+    initial.ts = 0;                // sample time in seconds
+    initial.proportionalCoeff = 0; // coeff for P
+    initial.integralCoeff = 0;     // coeff for I
+    initial.derivativeCoeff = 0;   // coeff for D
+    initial.feedFwdOffset = 0;     // offset coeff for feed-forward term
+    initial.feedFwdGain = 0;       // gain for feed-forward term
     initial.integralLimit.min = 0; // clamp of integral
     initial.integralLimit.max = 0;
     initial.outLim.min = 0;        // clamp of output
@@ -212,17 +213,18 @@ TEST(FanControllerTest, OutputProc_BehavesAsExpected)
     // Verifies that when the system is not in failsafe mode, the input value
     // to outputProc is used to drive the sensors (fans).
 
-    ZoneMock* z = new ZoneMock();;
+    ZoneMock* z = new ZoneMock();
+    ;
 
     std::vector<std::string> inputs = {"fan0", "fan1"};
     ec::pidinfo initial;
 
-    initial.ts = 0;                  // sample time in seconds
-    initial.proportionalCoeff = 0;   // coeff for P
-    initial.integralCoeff = 0;       // coeff for I
-    initial.derivativeCoeff = 0;     // coeff for D
-    initial.feedFwdOffset = 0;       // offset coeff for feed-forward term
-    initial.feedFwdGain = 0;         // gain for feed-forward term
+    initial.ts = 0;                // sample time in seconds
+    initial.proportionalCoeff = 0; // coeff for P
+    initial.integralCoeff = 0;     // coeff for I
+    initial.derivativeCoeff = 0;   // coeff for D
+    initial.feedFwdOffset = 0;     // offset coeff for feed-forward term
+    initial.feedFwdGain = 0;       // gain for feed-forward term
     initial.integralLimit.min = 0; // clamp of integral
     initial.integralLimit.max = 0;
     initial.outLim.min = 0;        // clamp of output
@@ -268,7 +270,8 @@ TEST(FanControllerTest, OutputProc_VerifyFailSafeWhenInputHigher)
     // If STRICT_FAILSAFE_PWM is defined, we expect the FailSafe PWM to be
     // capped to the failsafe PWM, and not go higher than that.
 
-    ZoneMock* z = new ZoneMock();;
+    ZoneMock* z = new ZoneMock();
+    ;
 
     std::vector<std::string> inputs = {"fan0"};
     ec::pidinfo initial;

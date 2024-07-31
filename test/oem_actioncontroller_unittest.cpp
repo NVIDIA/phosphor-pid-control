@@ -7,7 +7,6 @@
 
 TEST(OemActionControllerTest, Rotarfailure)
 {
-
     // Verifies that when fan rotor getting failed .
     // pwm value will be set to 80%
     double reading = 0;
