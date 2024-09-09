@@ -37,7 +37,8 @@ class DbusWritePercent : public WriteInterface
 
     DbusWritePercent(const std::string& path, int64_t min, int64_t max,
                      const std::string& connectionName) :
-        WriteInterface(min, max), path(path), connectionName(connectionName)
+        WriteInterface(min, max),
+        path(path), connectionName(connectionName)
     {}
 
     void write(double value) override;
@@ -58,7 +59,8 @@ class DbusWrite : public WriteInterface
 
     DbusWrite(const std::string& path, int64_t min, int64_t max,
               const std::string& connectionName) :
-        WriteInterface(min, max), path(path), connectionName(connectionName)
+        WriteInterface(min, max),
+        path(path), connectionName(connectionName)
     {}
 
     void write(double value) override;
