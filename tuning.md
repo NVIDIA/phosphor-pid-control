@@ -21,7 +21,7 @@ as `4000` or `5000`, and is in RPM.
 `/usr/share/swampd/config.json`, one can modify the PID parameters in the config
 file and restart the daemon to make the new values effective.
 
-```
+```sh
 systemctl restart phosphor-pid-control.service
 ```
 
@@ -30,7 +30,7 @@ systemctl restart phosphor-pid-control.service
 Flag `"-l \<path\>"` can be specified to enable the daemon to log fan control
 data into `path`. The log output is in CSV format with the following header:
 
-```
+```sh
 epoch_ms,setpt,fan1,fan2,...fanN,fleeting,failsafe
 ```
 
@@ -65,12 +65,12 @@ fan responses.
 
 ## Thermal Tuning Example
 
-1.  Create initial `/usr/share/swampd/config.json` used for PID control
-2.  (Option 1) If using a fixed setpoint, write the value to
-    `/etc/thermal.d/setpoint`, run swampd manually with
-    `swampd -l ${LOG_PATH}&`, and kill the process after desired duration.
-3.  (Option 2) If sweeping fan setpoint, using the tuning helper script
-    `fan_rpm_loop_test.sh` to configure fan setpoint in steps and collect logs
-4.  Parse logs from `${LOG_PATH}/zone_*.log` and analyze response data
-5.  Modify `/usr/share/swampd/config.json` as needed
-6.  Repeat from step 2 or step 3
+1. Create initial `/usr/share/swampd/config.json` used for PID control
+2. (Option 1) If using a fixed setpoint, write the value to
+   `/etc/thermal.d/setpoint`, run swampd manually with `swampd -l ${LOG_PATH}&`,
+   and kill the process after desired duration.
+3. (Option 2) If sweeping fan setpoint, using the tuning helper script
+   `fan_rpm_loop_test.sh` to configure fan setpoint in steps and collect logs
+4. Parse logs from `${LOG_PATH}/zone_*.log` and analyze response data
+5. Modify `/usr/share/swampd/config.json` as needed
+6. Repeat from step 2 or step 3
