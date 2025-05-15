@@ -1,5 +1,6 @@
 #pragma once
 
+#include "dbus/dbushelper_interface.hpp"
 #include "util.hpp"
 
 #include <string>
