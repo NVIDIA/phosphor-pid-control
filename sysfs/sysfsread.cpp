@@ -16,8 +16,11 @@
 
 #include "sysfs/sysfsread.hpp"
 
+#include "interfaces.hpp"
+
 #include <chrono>
 #include <filesystem>
+#include <cstdint>
 #include <fstream>
 #include <iostream>
 
