@@ -149,9 +149,9 @@ void DbusPassiveRedundancy::populateFailures(void)
     {
         for (const auto& [owner, _] : interfaceDict)
         {
-            auto call = passiveBus.new_method_call(
-                owner.c_str(), path.c_str(), properties::interface,
-                properties::getAll);
+            auto call = passiveBus.new_method_call(owner.c_str(), path.c_str(),
+                                                   properties::interface,
+                                                   properties::getAll);
             call.append(redundancy::interface);
 
             std::unordered_map<

@@ -1,7 +1,7 @@
-# DbusPassive
+#DbusPassive
 
 These sensors wait for their updates.
 
-# DbusActive
+#DbusActive
 
 These sensors reach out for their value.

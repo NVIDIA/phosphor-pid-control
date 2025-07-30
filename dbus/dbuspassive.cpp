@@ -115,9 +115,9 @@ std::unique_ptr<ReadInterface> DbusPassive::createDbusPassive(
         }
         std::cerr << "DbusPassive: Sensor " << path
                   << " is missing from D-Bus, build this sensor as failed\n";
-        return std::make_unique<DbusPassive>(
-            bus, type, id, std::move(helper), settings, failed, path,
-            redundancy);
+        return std::make_unique<DbusPassive>(bus, type, id, std::move(helper),
+                                             settings, failed, path,
+                                             redundancy);
 #endif
     }
 
@@ -386,8 +386,8 @@ int handleSensorValue(sdbusplus::message_t& msg, DbusPassive* owner)
         auto valPropMap = msgData.find("Value");
         if (valPropMap != msgData.end())
         {
-            double value =
-                std::visit(VariantToDoubleVisitor(), valPropMap->second);
+            double value = std::visit(VariantToDoubleVisitor(),
+                                      valPropMap->second);
 
             owner->updateValue(value, false);
         }

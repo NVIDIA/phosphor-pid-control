@@ -151,8 +151,8 @@ void restartControlLoops()
         {
             auto jsonData = parseValidateJson(path);
             sensorConfig = buildSensorsFromJson(jsonData);
-            std::tie(zoneConfig, zoneDetailsConfig) =
-                buildPIDsFromJson(jsonData);
+            std::tie(zoneConfig,
+                     zoneDetailsConfig) = buildPIDsFromJson(jsonData);
         }
         catch (const std::exception& e)
         {
@@ -171,8 +171,8 @@ void restartControlLoops()
     }
 
     state::mgmr = buildSensors(sensorConfig, passiveBus, hostBus);
-    state::zones =
-        buildZones(zoneConfig, zoneDetailsConfig, *state::mgmr, modeControlBus);
+    state::zones = buildZones(zoneConfig, zoneDetailsConfig, *state::mgmr,
+                              modeControlBus);
     // Set `logMaxCountPerSecond` to 20 will limit the number of logs output per
     // second in each zone. Using 20 here would limit the output rate to be no
     // larger than 100 per sec for most platforms as the number of zones are
@@ -222,9 +222,8 @@ void tryRestartControlLoops(bool first)
     // first time of trying to restart the control loop without a delay
     if (first)
     {
-        boost::asio::post(io, [restartLbd] {
-            restartLbd(boost::system::error_code());
-        });
+        boost::asio::post(
+            io, [restartLbd] { restartLbd(boost::system::error_code()); });
     }
     // re-try control loop, set up a delay.
     else

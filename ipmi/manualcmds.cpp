@@ -32,8 +32,9 @@ namespace pid_control::ipmi
 static constexpr auto manualProperty = "Manual";
 static constexpr auto failsafeProperty = "FailSafe";
 
-::ipmi::Cc ZoneControlIpmiHandler::getFailsafeModeState(
-    const uint8_t* reqBuf, uint8_t* replyBuf, size_t* dataLen)
+::ipmi::Cc ZoneControlIpmiHandler::getFailsafeModeState(const uint8_t* reqBuf,
+                                                        uint8_t* replyBuf,
+                                                        size_t* dataLen)
 {
     bool current;
 
@@ -45,8 +46,8 @@ static constexpr auto failsafeProperty = "FailSafe";
     const auto request =
         reinterpret_cast<const struct FanCtrlRequest*>(&reqBuf[0]);
 
-    ::ipmi::Cc rc =
-        _control->getFanCtrlProperty(request->zone, &current, failsafeProperty);
+    ::ipmi::Cc rc = _control->getFanCtrlProperty(request->zone, &current,
+                                                 failsafeProperty);
     if (rc)
     {
         return rc;
@@ -63,8 +64,9 @@ static constexpr auto failsafeProperty = "FailSafe";
  *   <arg name="properties" direction="out" type="a{sv}"/>
  * </method>
  */
-::ipmi::Cc ZoneControlIpmiHandler::getManualModeState(
-    const uint8_t* reqBuf, uint8_t* replyBuf, size_t* dataLen)
+::ipmi::Cc ZoneControlIpmiHandler::getManualModeState(const uint8_t* reqBuf,
+                                                      uint8_t* replyBuf,
+                                                      size_t* dataLen)
 {
     bool current;
 
@@ -76,8 +78,8 @@ static constexpr auto failsafeProperty = "FailSafe";
     const auto request =
         reinterpret_cast<const struct FanCtrlRequest*>(&reqBuf[0]);
 
-    ::ipmi::Cc rc =
-        _control->getFanCtrlProperty(request->zone, &current, manualProperty);
+    ::ipmi::Cc rc = _control->getFanCtrlProperty(request->zone, &current,
+                                                 manualProperty);
     if (rc)
     {
         return rc;
@@ -114,9 +116,10 @@ static constexpr auto failsafeProperty = "FailSafe";
 }
 
 /* Three command packages: get, set true, set false */
-::ipmi::Cc manualModeControl(
-    ZoneControlIpmiHandler* handler, [[maybe_unused]] uint8_t cmd,
-    const uint8_t* reqBuf, uint8_t* replyCmdBuf, size_t* dataLen)
+::ipmi::Cc manualModeControl(ZoneControlIpmiHandler* handler,
+                             [[maybe_unused]] uint8_t cmd,
+                             const uint8_t* reqBuf, uint8_t* replyCmdBuf,
+                             size_t* dataLen)
 {
     // FanCtrlRequest is the smaller of the requests, so it's at a minimum.
     if (*dataLen < sizeof(struct FanCtrlRequest))

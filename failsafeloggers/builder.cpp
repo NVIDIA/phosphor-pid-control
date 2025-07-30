@@ -52,8 +52,8 @@ void buildFailsafeLoggers(
         for (const std::string& sensorName : sensorNames)
         {
             if (std::find(sensorNameToZoneId[sensorName].begin(),
-                          sensorNameToZoneId[sensorName].end(), zoneId) ==
-                sensorNameToZoneId[sensorName].end())
+                          sensorNameToZoneId[sensorName].end(),
+                          zoneId) == sensorNameToZoneId[sensorName].end())
             {
                 sensorNameToZoneId[sensorName].push_back(zoneId);
             }

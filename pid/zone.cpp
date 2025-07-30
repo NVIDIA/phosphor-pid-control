@@ -125,8 +125,8 @@ void DbusPidZone::markSensorMissing(const std::string& name,
     }
     else
     {
-        _failSafeSensors[name] =
-            std::pair(failReason, _sensorFailSafePercent[name]);
+        _failSafeSensors[name] = std::pair(failReason,
+                                           _sensorFailSafePercent[name]);
     }
 
     if (debugEnabled)
@@ -201,12 +201,12 @@ double DbusPidZone::getFailSafePercent(void)
         return _zoneFailSafePercent;
     }
 
-    FailSafeSensorsMap::iterator maxData = std::max_element(
-        _failSafeSensors.begin(), _failSafeSensors.end(),
-        [](const FailSafeSensorPair& firstData,
-           const FailSafeSensorPair& secondData) {
-            return firstData.second.second < secondData.second.second;
-        });
+    FailSafeSensorsMap::iterator maxData =
+        std::max_element(_failSafeSensors.begin(), _failSafeSensors.end(),
+                         [](const FailSafeSensorPair& firstData,
+                            const FailSafeSensorPair& secondData) {
+        return firstData.second.second < secondData.second.second;
+    });
 
     // In dbus/dbusconfiguration.cpp, the default sensor failsafepercent is 0 if
     // there is no setting in json.
@@ -601,9 +601,10 @@ bool DbusPidZone::failSafe() const
     return getFailSafeMode();
 }
 
-void DbusPidZone::addPidControlProcess(
-    const std::string& name, const std::string& type, double setpoint,
-    sdbusplus::bus_t& bus, const std::string& objPath, bool defer)
+void DbusPidZone::addPidControlProcess(const std::string& name,
+                                       const std::string& type, double setpoint,
+                                       sdbusplus::bus_t& bus,
+                                       const std::string& objPath, bool defer)
 {
     _pidsControlProcess[name] = std::make_unique<ProcessObject>(
         bus, objPath.c_str(),
@@ -670,8 +671,9 @@ std::string DbusPidZone::leader() const
     return _maximumSetPointName;
 }
 
-void DbusPidZone::updateThermalPowerDebugInterface(
-    std::string pidName, std::string leader, double input, double output)
+void DbusPidZone::updateThermalPowerDebugInterface(std::string pidName,
+                                                   std::string leader,
+                                                   double input, double output)
 {
     if (leader.empty())
     {
