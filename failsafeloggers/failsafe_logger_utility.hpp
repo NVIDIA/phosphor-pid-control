@@ -23,10 +23,9 @@ namespace pid_control
 /** Given a sensor name, attempt to output entering/leaving-failsafe-mode
  * logs for its corresponding zones.
  */
-inline void outputFailsafeLogWithSensor(const std::string& sensorName,
-                                        const bool newFailsafeState,
-                                        const std::string& location,
-                                        const std::string& reason)
+inline void outputFailsafeLogWithSensor(
+    const std::string& sensorName, const bool newFailsafeState,
+    const std::string& location, const std::string& reason)
 {
     for (const int64_t zoneId : sensorNameToZoneId[sensorName])
     {
@@ -41,10 +40,9 @@ inline void outputFailsafeLogWithSensor(const std::string& sensorName,
 /** Given a zone ID, attempt to output entering/leaving-failsafe-mode
  * logs for its corresponding zones.
  */
-inline void outputFailsafeLogWithZone(const int64_t zoneId,
-                                      const bool newFailsafeState,
-                                      const std::string& location,
-                                      const std::string& reason)
+inline void outputFailsafeLogWithZone(
+    const int64_t zoneId, const bool newFailsafeState,
+    const std::string& location, const std::string& reason)
 {
     if (zoneIdToFailsafeLogger.count(zoneId))
     {

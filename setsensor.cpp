@@ -1,6 +1,8 @@
 #include <sdbusplus/bus.hpp>
 #include <sdbusplus/exception.hpp>
 #include <sdbusplus/message.hpp>
+#include <xyz/openbmc_project/Control/Mode/client.hpp>
+#include <xyz/openbmc_project/Sensor/Value/client.hpp>
 
 #include <cstdint>
 #include <cstdio>
@@ -10,16 +12,15 @@
 /* Fan Control */
 static constexpr auto objectPath = "/xyz/openbmc_project/settings/fanctrl/zone";
 static constexpr auto busName = "xyz.openbmc_project.State.FanCtrl";
-static constexpr auto intf = "xyz.openbmc_project.Control.Mode";
-static constexpr auto property = "Manual";
 using Value = std::variant<bool>;
+
+using SensorValue = sdbusplus::common::xyz::openbmc_project::sensor::Value;
+using ControlMode = sdbusplus::common::xyz::openbmc_project::control::Mode;
 
 /* Host Sensor. */
 static constexpr auto sobjectPath =
     "/xyz/openbmc_project/extsensors/margin/sluggish0";
 static constexpr auto sbusName = "xyz.openbmc_project.Hwmon.external";
-static constexpr auto sintf = "xyz.openbmc_project.Sensor.Value";
-static constexpr auto sproperty = "Value";
 using sValue = std::variant<int64_t>;
 
 static constexpr auto propertiesintf = "org.freedesktop.DBus.Properties";
@@ -36,8 +37,8 @@ static void SetHostSensor(void)
     auto pimMsg = PropertyWriteBus.new_method_call(
         busname.c_str(), path.c_str(), propertiesintf, "Set");
 
-    pimMsg.append(sintf);
-    pimMsg.append(sproperty);
+    pimMsg.append(SensorValue::interface);
+    pimMsg.append(SensorValue::property_names::value);
     pimMsg.append(v);
 
     try
@@ -69,8 +70,8 @@ static void SetManualMode(int8_t zone)
     auto pimMsg = PropertyWriteBus.new_method_call(
         busname.c_str(), path.c_str(), propertiesintf, "Set");
 
-    pimMsg.append(intf);
-    pimMsg.append(property);
+    pimMsg.append(ControlMode::interface);
+    pimMsg.append(ControlMode::property_names::manual);
     pimMsg.append(v);
 
     try

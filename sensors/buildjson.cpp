@@ -1,18 +1,5 @@
-/**
- * Copyright 2019 Google Inc.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+// SPDX-License-Identifier: Apache-2.0
+// SPDX-FileCopyrightText: Copyright 2019 Google Inc
 
 #include "sensors/buildjson.hpp"
 
@@ -51,6 +38,7 @@ void from_json(const json& j, conf::SensorConfig& s)
      */
     s.ignoreDbusMinMax = false;
     s.unavailableAsFailed = true;
+    s.ignoreFailIfHostOff = false;
     s.min = 0;
     s.max = 0;
 
@@ -64,6 +52,12 @@ void from_json(const json& j, conf::SensorConfig& s)
     if (findunAsF != j.end())
     {
         j.at("unavailableAsFailed").get_to(s.unavailableAsFailed);
+    }
+
+    auto findIgnoreIfHostOff = j.find("ignoreFailIfHostOff");
+    if (findIgnoreIfHostOff != j.end())
+    {
+        j.at("ignoreFailIfHostOff").get_to(s.ignoreFailIfHostOff);
     }
 
     /* The min field is optional in a configuration. */

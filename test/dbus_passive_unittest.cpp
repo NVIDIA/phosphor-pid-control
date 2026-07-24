@@ -9,6 +9,9 @@
 #include <sdbusplus/bus.hpp>
 #include <sdbusplus/message.hpp>
 #include <sdbusplus/test/sdbus_mock.hpp>
+#include <xyz/openbmc_project/Sensor/Threshold/Critical/common.hpp>
+#include <xyz/openbmc_project/Sensor/Value/common.hpp>
+#include <xyz/openbmc_project/State/Decorator/Availability/common.hpp>
 
 #include <cmath>
 #include <cstdint>
@@ -31,7 +34,11 @@ using ::testing::NotNull;
 using ::testing::Return;
 using ::testing::StrEq;
 
-std::string SensorIntf = "xyz.openbmc_project.Sensor.Value";
+using SensorValue = sdbusplus::common::xyz::openbmc_project::sensor::Value;
+using ThresholdCritical =
+    sdbusplus::common::xyz::openbmc_project::sensor::threshold::Critical;
+using DecoratorAvailability =
+    sdbusplus::common::xyz::openbmc_project::state::decorator::Availability;
 
 TEST(DbusPassiveTest, FactoryFailsWithInvalidType)
 {
@@ -59,21 +66,12 @@ TEST(DbusPassiveTest, BoringConstructorTest)
     auto bus_mock = sdbusplus::get_mocked_new(&sdbus_mock);
     std::string type = "invalid";
     std::string id = "id";
-    std::string path = "/xyz/openbmc_project/sensors/unknown/id";
+    std::string path =
+        std::format("{}/unknown/id", SensorValue::namespace_path::value);
 
     auto helper = std::make_unique<DbusHelperMock>();
-    SensorProperties properties;
 
-    properties.scale = -3;
-    properties.value = 10;
-    properties.unit = "x";
-    properties.min = 0;
-    properties.max = 3000;
-    properties.available = false;
-    properties.unavailableAsFailed = false;
-
-    DbusPassive(bus_mock, type, id, std::move(helper), properties, false, path,
-                nullptr);
+    DbusPassive(bus_mock, type, id, std::move(helper), false, path, nullptr);
     // Success
 }
 
@@ -84,7 +82,8 @@ class DbusPassiveTestObj : public ::testing::Test
         sdbus_mock(), bus_mock(sdbusplus::get_mocked_new(&sdbus_mock)),
         helper(std::make_unique<DbusHelperMock>())
     {
-        EXPECT_CALL(*helper, getService(StrEq(SensorIntf), StrEq(path)))
+        EXPECT_CALL(*helper,
+                    getService(StrEq(SensorValue::interface), StrEq(path)))
             .WillOnce(Return("asdf"));
 
         EXPECT_CALL(*helper,
@@ -92,13 +91,13 @@ class DbusPassiveTestObj : public ::testing::Test
             .WillOnce(Invoke([&]([[maybe_unused]] const std::string& service,
                                  [[maybe_unused]] const std::string& path,
                                  SensorProperties* prop) {
-            prop->scale = _scale;
-            prop->value = _value;
-            prop->unit = "x";
-            prop->min = 0;
-            prop->max = 0;
-            prop->available = true;
-        }));
+                prop->scale = _scale;
+                prop->value = _value;
+                prop->unit = "x";
+                prop->min = 0;
+                prop->max = 0;
+                prop->available = true;
+            }));
         EXPECT_CALL(*helper, thresholdsAsserted(StrEq("asdf"), StrEq(path)))
             .WillOnce(Return(false));
 
@@ -115,7 +114,9 @@ class DbusPassiveTestObj : public ::testing::Test
     std::unique_ptr<DbusHelperMock> helper;
     std::string type = "temp";
     std::string id = "id";
-    std::string path = "/xyz/openbmc_project/sensors/temperature/id";
+    std::string path =
+        std::format("{}/{}/id", SensorValue::namespace_path::value,
+                    SensorValue::namespace_path::temperature);
     int64_t _scale = -3;
     int64_t _value = 10;
 
@@ -174,25 +175,24 @@ TEST_F(DbusPassiveTestObj, VerifyHandlesDbusSignal)
 
     const char* Value = "Value";
     int64_t xValue = 10000;
-    const char* intf = "xyz.openbmc_project.Sensor.Value";
     // string, std::map<std::string, std::variant<int64_t>>
     // msg.read(msgSensor, msgData);
 
     EXPECT_CALL(sdbus_mock, sd_bus_message_read_basic(IsNull(), 's', NotNull()))
         .WillOnce(Invoke([&]([[maybe_unused]] sd_bus_message* m,
                              [[maybe_unused]] char type, void* p) {
-        const char** s = static_cast<const char**>(p);
-        // Read the first parameter, the string.
-        *s = intf;
-        return 0;
-    }))
+            const char** s = static_cast<const char**>(p);
+            // Read the first parameter, the string.
+            *s = SensorValue::interface;
+            return 0;
+        }))
         .WillOnce(Invoke([&]([[maybe_unused]] sd_bus_message* m,
                              [[maybe_unused]] char type, void* p) {
-        const char** s = static_cast<const char**>(p);
-        *s = Value;
-        // Read the string in the pair (dictionary).
-        return 0;
-    }));
+            const char** s = static_cast<const char**>(p);
+            *s = Value;
+            // Read the string in the pair (dictionary).
+            return 0;
+        }));
 
     // std::map
     EXPECT_CALL(sdbus_mock,
@@ -219,10 +219,10 @@ TEST_F(DbusPassiveTestObj, VerifyHandlesDbusSignal)
     EXPECT_CALL(sdbus_mock, sd_bus_message_read_basic(IsNull(), 'x', NotNull()))
         .WillOnce(Invoke([&]([[maybe_unused]] sd_bus_message* m,
                              [[maybe_unused]] char type, void* p) {
-        int64_t* s = static_cast<int64_t*>(p);
-        *s = xValue;
-        return 0;
-    }));
+            int64_t* s = static_cast<int64_t*>(p);
+            *s = xValue;
+            return 0;
+        }));
 
     EXPECT_CALL(sdbus_mock, sd_bus_message_exit_container(IsNull()))
         .WillOnce(Return(0))  /* variant. */
@@ -247,25 +247,24 @@ TEST_F(DbusPassiveTestObj, VerifyIgnoresOtherPropertySignal)
 
     const char* Scale = "Scale";
     int64_t xScale = -6;
-    const char* intf = "xyz.openbmc_project.Sensor.Value";
     // string, std::map<std::string, std::variant<int64_t>>
     // msg.read(msgSensor, msgData);
 
     EXPECT_CALL(sdbus_mock, sd_bus_message_read_basic(IsNull(), 's', NotNull()))
         .WillOnce(Invoke([&]([[maybe_unused]] sd_bus_message* m,
                              [[maybe_unused]] char type, void* p) {
-        const char** s = static_cast<const char**>(p);
-        // Read the first parameter, the string.
-        *s = intf;
-        return 0;
-    }))
+            const char** s = static_cast<const char**>(p);
+            // Read the first parameter, the string.
+            *s = SensorValue::interface;
+            return 0;
+        }))
         .WillOnce(Invoke([&]([[maybe_unused]] sd_bus_message* m,
                              [[maybe_unused]] char type, void* p) {
-        const char** s = static_cast<const char**>(p);
-        *s = Scale;
-        // Read the string in the pair (dictionary).
-        return 0;
-    }));
+            const char** s = static_cast<const char**>(p);
+            *s = Scale;
+            // Read the string in the pair (dictionary).
+            return 0;
+        }));
 
     // std::map
     EXPECT_CALL(sdbus_mock,
@@ -292,10 +291,10 @@ TEST_F(DbusPassiveTestObj, VerifyIgnoresOtherPropertySignal)
     EXPECT_CALL(sdbus_mock, sd_bus_message_read_basic(IsNull(), 'x', NotNull()))
         .WillOnce(Invoke([&]([[maybe_unused]] sd_bus_message* m,
                              [[maybe_unused]] char type, void* p) {
-        int64_t* s = static_cast<int64_t*>(p);
-        *s = xScale;
-        return 0;
-    }));
+            int64_t* s = static_cast<int64_t*>(p);
+            *s = xScale;
+            return 0;
+        }));
 
     EXPECT_CALL(sdbus_mock, sd_bus_message_exit_container(IsNull()))
         .WillOnce(Return(0))  /* variant. */
@@ -316,27 +315,25 @@ TEST_F(DbusPassiveTestObj, VerifyCriticalThresholdAssert)
         .WillOnce(Return(nullptr));
     sdbusplus::message_t msg(nullptr, &sdbus_mock);
 
-    const char* criticalAlarm = "CriticalAlarmHigh";
     bool alarm = true;
-    const char* intf = "xyz.openbmc_project.Sensor.Threshold.Critical";
 
     passive->setFailed(false);
 
     EXPECT_CALL(sdbus_mock, sd_bus_message_read_basic(IsNull(), 's', NotNull()))
         .WillOnce(Invoke([&]([[maybe_unused]] sd_bus_message* m,
                              [[maybe_unused]] char type, void* p) {
-        const char** s = static_cast<const char**>(p);
-        // Read the first parameter, the string.
-        *s = intf;
-        return 0;
-    }))
+            const char** s = static_cast<const char**>(p);
+            // Read the first parameter, the string.
+            *s = ThresholdCritical::interface;
+            return 0;
+        }))
         .WillOnce(Invoke([&]([[maybe_unused]] sd_bus_message* m,
                              [[maybe_unused]] char type, void* p) {
-        const char** s = static_cast<const char**>(p);
-        *s = criticalAlarm;
-        // Read the string in the pair (dictionary).
-        return 0;
-    }));
+            const char** s = static_cast<const char**>(p);
+            *s = ThresholdCritical::property_names::critical_alarm_high;
+            // Read the string in the pair (dictionary).
+            return 0;
+        }));
 
     // std::map
     EXPECT_CALL(sdbus_mock,
@@ -369,10 +366,10 @@ TEST_F(DbusPassiveTestObj, VerifyCriticalThresholdAssert)
     EXPECT_CALL(sdbus_mock, sd_bus_message_read_basic(IsNull(), 'b', NotNull()))
         .WillOnce(Invoke([&]([[maybe_unused]] sd_bus_message* m,
                              [[maybe_unused]] char type, void* p) {
-        bool* s = static_cast<bool*>(p);
-        *s = alarm;
-        return 0;
-    }));
+            bool* s = static_cast<bool*>(p);
+            *s = alarm;
+            return 0;
+        }));
 
     EXPECT_CALL(sdbus_mock, sd_bus_message_exit_container(IsNull()))
         .WillOnce(Return(0))  /* variant. */
@@ -393,27 +390,25 @@ TEST_F(DbusPassiveTestObj, VerifyCriticalThresholdDeassert)
         .WillOnce(Return(nullptr));
     sdbusplus::message_t msg(nullptr, &sdbus_mock);
 
-    const char* criticalAlarm = "CriticalAlarmHigh";
     bool alarm = false;
-    const char* intf = "xyz.openbmc_project.Sensor.Threshold.Critical";
 
     passive->setFailed(true);
 
     EXPECT_CALL(sdbus_mock, sd_bus_message_read_basic(IsNull(), 's', NotNull()))
         .WillOnce(Invoke([&]([[maybe_unused]] sd_bus_message* m,
                              [[maybe_unused]] char type, void* p) {
-        const char** s = static_cast<const char**>(p);
-        // Read the first parameter, the string.
-        *s = intf;
-        return 0;
-    }))
+            const char** s = static_cast<const char**>(p);
+            // Read the first parameter, the string.
+            *s = ThresholdCritical::interface;
+            return 0;
+        }))
         .WillOnce(Invoke([&]([[maybe_unused]] sd_bus_message* m,
                              [[maybe_unused]] char type, void* p) {
-        const char** s = static_cast<const char**>(p);
-        *s = criticalAlarm;
-        // Read the string in the pair (dictionary).
-        return 0;
-    }));
+            const char** s = static_cast<const char**>(p);
+            *s = ThresholdCritical::property_names::critical_alarm_high;
+            // Read the string in the pair (dictionary).
+            return 0;
+        }));
 
     // std::map
     EXPECT_CALL(sdbus_mock,
@@ -446,10 +441,10 @@ TEST_F(DbusPassiveTestObj, VerifyCriticalThresholdDeassert)
     EXPECT_CALL(sdbus_mock, sd_bus_message_read_basic(IsNull(), 'b', NotNull()))
         .WillOnce(Invoke([&]([[maybe_unused]] sd_bus_message* m,
                              [[maybe_unused]] char type, void* p) {
-        bool* s = static_cast<bool*>(p);
-        *s = alarm;
-        return 0;
-    }));
+            bool* s = static_cast<bool*>(p);
+            *s = alarm;
+            return 0;
+        }));
 
     EXPECT_CALL(sdbus_mock, sd_bus_message_exit_container(IsNull()))
         .WillOnce(Return(0))  /* variant. */
@@ -470,27 +465,25 @@ TEST_F(DbusPassiveTestObj, VerifyAvailableDeassert)
         .WillOnce(Return(nullptr));
     sdbusplus::message_t msg(nullptr, &sdbus_mock);
 
-    const char* property = "Available";
     bool asserted = false;
-    const char* intf = "xyz.openbmc_project.State.Decorator.Availability";
 
     passive->setAvailable(true);
 
     EXPECT_CALL(sdbus_mock, sd_bus_message_read_basic(IsNull(), 's', NotNull()))
         .WillOnce(Invoke([&]([[maybe_unused]] sd_bus_message* m,
                              [[maybe_unused]] char type, void* p) {
-        const char** s = static_cast<const char**>(p);
-        // Read the first parameter, the string.
-        *s = intf;
-        return 0;
-    }))
+            const char** s = static_cast<const char**>(p);
+            // Read the first parameter, the string.
+            *s = DecoratorAvailability::interface;
+            return 0;
+        }))
         .WillOnce(Invoke([&]([[maybe_unused]] sd_bus_message* m,
                              [[maybe_unused]] char type, void* p) {
-        const char** s = static_cast<const char**>(p);
-        *s = property;
-        // Read the string in the pair (dictionary).
-        return 0;
-    }));
+            const char** s = static_cast<const char**>(p);
+            *s = DecoratorAvailability::property_names::available;
+            // Read the string in the pair (dictionary).
+            return 0;
+        }));
 
     // std::map
     EXPECT_CALL(sdbus_mock,
@@ -523,10 +516,10 @@ TEST_F(DbusPassiveTestObj, VerifyAvailableDeassert)
     EXPECT_CALL(sdbus_mock, sd_bus_message_read_basic(IsNull(), 'b', NotNull()))
         .WillOnce(Invoke([&]([[maybe_unused]] sd_bus_message* m,
                              [[maybe_unused]] char type, void* p) {
-        bool* s = static_cast<bool*>(p);
-        *s = asserted;
-        return 0;
-    }));
+            bool* s = static_cast<bool*>(p);
+            *s = asserted;
+            return 0;
+        }));
 
     EXPECT_CALL(sdbus_mock, sd_bus_message_exit_container(IsNull()))
         .WillOnce(Return(0))  /* variant. */
@@ -547,9 +540,7 @@ TEST_F(DbusPassiveTestObj, VerifyAvailableAssert)
         .WillOnce(Return(nullptr));
     sdbusplus::message_t msg(nullptr, &sdbus_mock);
 
-    const char* property = "Available";
     bool asserted = true;
-    const char* intf = "xyz.openbmc_project.State.Decorator.Availability";
 
     passive->setAvailable(false);
     bool failed = passive->getFailed();
@@ -558,18 +549,18 @@ TEST_F(DbusPassiveTestObj, VerifyAvailableAssert)
     EXPECT_CALL(sdbus_mock, sd_bus_message_read_basic(IsNull(), 's', NotNull()))
         .WillOnce(Invoke([&]([[maybe_unused]] sd_bus_message* m,
                              [[maybe_unused]] char type, void* p) {
-        const char** s = static_cast<const char**>(p);
-        // Read the first parameter, the string.
-        *s = intf;
-        return 0;
-    }))
+            const char** s = static_cast<const char**>(p);
+            // Read the first parameter, the string.
+            *s = DecoratorAvailability::interface;
+            return 0;
+        }))
         .WillOnce(Invoke([&]([[maybe_unused]] sd_bus_message* m,
                              [[maybe_unused]] char type, void* p) {
-        const char** s = static_cast<const char**>(p);
-        *s = property;
-        // Read the string in the pair (dictionary).
-        return 0;
-    }));
+            const char** s = static_cast<const char**>(p);
+            *s = DecoratorAvailability::property_names::available;
+            // Read the string in the pair (dictionary).
+            return 0;
+        }));
 
     // std::map
     EXPECT_CALL(sdbus_mock,
@@ -602,10 +593,10 @@ TEST_F(DbusPassiveTestObj, VerifyAvailableAssert)
     EXPECT_CALL(sdbus_mock, sd_bus_message_read_basic(IsNull(), 'b', NotNull()))
         .WillOnce(Invoke([&]([[maybe_unused]] sd_bus_message* m,
                              [[maybe_unused]] char type, void* p) {
-        bool* s = static_cast<bool*>(p);
-        *s = asserted;
-        return 0;
-    }));
+            bool* s = static_cast<bool*>(p);
+            *s = asserted;
+            return 0;
+        }));
 
     EXPECT_CALL(sdbus_mock, sd_bus_message_exit_container(IsNull()))
         .WillOnce(Return(0))  /* variant. */
@@ -625,7 +616,8 @@ class DbusPassiveTestUnaSensorNotAsFailedObj : public ::testing::Test
         sdbus_mock(), bus_mock(sdbusplus::get_mocked_new(&sdbus_mock)),
         helper(std::make_unique<DbusHelperMock>())
     {
-        EXPECT_CALL(*helper, getService(StrEq(SensorIntf), StrEq(path)))
+        EXPECT_CALL(*helper,
+                    getService(StrEq(SensorValue::interface), StrEq(path)))
             .WillOnce(Return("asdf"));
 
         EXPECT_CALL(*helper,
@@ -633,13 +625,13 @@ class DbusPassiveTestUnaSensorNotAsFailedObj : public ::testing::Test
             .WillOnce(Invoke([&]([[maybe_unused]] const std::string& service,
                                  [[maybe_unused]] const std::string& path,
                                  SensorProperties* prop) {
-            prop->scale = _scale;
-            prop->value = _value;
-            prop->unit = "x";
-            prop->min = 0;
-            prop->max = 0;
-            prop->available = true;
-        }));
+                prop->scale = _scale;
+                prop->value = _value;
+                prop->unit = "x";
+                prop->min = 0;
+                prop->max = 0;
+                prop->available = true;
+            }));
         EXPECT_CALL(*helper, thresholdsAsserted(StrEq("asdf"), StrEq(path)))
             .WillOnce(Return(false));
 
@@ -656,7 +648,9 @@ class DbusPassiveTestUnaSensorNotAsFailedObj : public ::testing::Test
     std::unique_ptr<DbusHelperMock> helper;
     std::string type = "temp";
     std::string id = "id";
-    std::string path = "/xyz/openbmc_project/sensors/temperature/id";
+    std::string path =
+        std::format("{}/{}/id", SensorValue::namespace_path::value,
+                    SensorValue::namespace_path::temperature);
     int64_t _scale = -3;
     int64_t _value = 10;
 
@@ -672,27 +666,25 @@ TEST_F(DbusPassiveTestUnaSensorNotAsFailedObj, VerifyAvailableDeassert)
         .WillOnce(Return(nullptr));
     sdbusplus::message_t msg(nullptr, &sdbus_mock);
 
-    const char* property = "Available";
     bool asserted = false;
-    const char* intf = "xyz.openbmc_project.State.Decorator.Availability";
 
     passive->setAvailable(true);
 
     EXPECT_CALL(sdbus_mock, sd_bus_message_read_basic(IsNull(), 's', NotNull()))
         .WillOnce(Invoke([&]([[maybe_unused]] sd_bus_message* m,
                              [[maybe_unused]] char type, void* p) {
-        const char** s = static_cast<const char**>(p);
-        // Read the first parameter, the string.
-        *s = intf;
-        return 0;
-    }))
+            const char** s = static_cast<const char**>(p);
+            // Read the first parameter, the string.
+            *s = DecoratorAvailability::interface;
+            return 0;
+        }))
         .WillOnce(Invoke([&]([[maybe_unused]] sd_bus_message* m,
                              [[maybe_unused]] char type, void* p) {
-        const char** s = static_cast<const char**>(p);
-        *s = property;
-        // Read the string in the pair (dictionary).
-        return 0;
-    }));
+            const char** s = static_cast<const char**>(p);
+            *s = DecoratorAvailability::property_names::available;
+            // Read the string in the pair (dictionary).
+            return 0;
+        }));
 
     // std::map
     EXPECT_CALL(sdbus_mock,
@@ -725,10 +717,10 @@ TEST_F(DbusPassiveTestUnaSensorNotAsFailedObj, VerifyAvailableDeassert)
     EXPECT_CALL(sdbus_mock, sd_bus_message_read_basic(IsNull(), 'b', NotNull()))
         .WillOnce(Invoke([&]([[maybe_unused]] sd_bus_message* m,
                              [[maybe_unused]] char type, void* p) {
-        bool* s = static_cast<bool*>(p);
-        *s = asserted;
-        return 0;
-    }));
+            bool* s = static_cast<bool*>(p);
+            *s = asserted;
+            return 0;
+        }));
 
     EXPECT_CALL(sdbus_mock, sd_bus_message_exit_container(IsNull()))
         .WillOnce(Return(0))  /* variant. */
@@ -751,9 +743,7 @@ TEST_F(DbusPassiveTestUnaSensorNotAsFailedObj, VerifyAvailableAssert)
         .WillOnce(Return(nullptr));
     sdbusplus::message_t msg(nullptr, &sdbus_mock);
 
-    const char* property = "Available";
     bool asserted = true;
-    const char* intf = "xyz.openbmc_project.State.Decorator.Availability";
 
     passive->setAvailable(false);
     bool failed = passive->getFailed();
@@ -762,18 +752,18 @@ TEST_F(DbusPassiveTestUnaSensorNotAsFailedObj, VerifyAvailableAssert)
     EXPECT_CALL(sdbus_mock, sd_bus_message_read_basic(IsNull(), 's', NotNull()))
         .WillOnce(Invoke([&]([[maybe_unused]] sd_bus_message* m,
                              [[maybe_unused]] char type, void* p) {
-        const char** s = static_cast<const char**>(p);
-        // Read the first parameter, the string.
-        *s = intf;
-        return 0;
-    }))
+            const char** s = static_cast<const char**>(p);
+            // Read the first parameter, the string.
+            *s = DecoratorAvailability::interface;
+            return 0;
+        }))
         .WillOnce(Invoke([&]([[maybe_unused]] sd_bus_message* m,
                              [[maybe_unused]] char type, void* p) {
-        const char** s = static_cast<const char**>(p);
-        *s = property;
-        // Read the string in the pair (dictionary).
-        return 0;
-    }));
+            const char** s = static_cast<const char**>(p);
+            *s = DecoratorAvailability::property_names::available;
+            // Read the string in the pair (dictionary).
+            return 0;
+        }));
 
     // std::map
     EXPECT_CALL(sdbus_mock,
@@ -806,10 +796,10 @@ TEST_F(DbusPassiveTestUnaSensorNotAsFailedObj, VerifyAvailableAssert)
     EXPECT_CALL(sdbus_mock, sd_bus_message_read_basic(IsNull(), 'b', NotNull()))
         .WillOnce(Invoke([&]([[maybe_unused]] sd_bus_message* m,
                              [[maybe_unused]] char type, void* p) {
-        bool* s = static_cast<bool*>(p);
-        *s = asserted;
-        return 0;
-    }));
+            bool* s = static_cast<bool*>(p);
+            *s = asserted;
+            return 0;
+        }));
 
     EXPECT_CALL(sdbus_mock, sd_bus_message_exit_container(IsNull()))
         .WillOnce(Return(0))  /* variant. */
@@ -844,7 +834,8 @@ class DbusPassiveTest3kMaxObj : public ::testing::Test
         sdbus_mock(), bus_mock(sdbusplus::get_mocked_new(&sdbus_mock)),
         helper(std::make_unique<DbusHelperMock>())
     {
-        EXPECT_CALL(*helper, getService(StrEq(SensorIntf), StrEq(path)))
+        EXPECT_CALL(*helper,
+                    getService(StrEq(SensorValue::interface), StrEq(path)))
             .WillOnce(Return("asdf"));
 
         EXPECT_CALL(*helper,
@@ -865,7 +856,9 @@ class DbusPassiveTest3kMaxObj : public ::testing::Test
     std::unique_ptr<DbusHelperMock> helper;
     std::string type = "temp";
     std::string id = "id";
-    std::string path = "/xyz/openbmc_project/sensors/temperature/id";
+    std::string path =
+        std::format("{}/{}/id", SensorValue::namespace_path::value,
+                    SensorValue::namespace_path::temperature);
     int64_t _scale = -3;
     int64_t _value = 10;
 
@@ -887,7 +880,8 @@ class DbusPassiveTest3kMaxIgnoredObj : public ::testing::Test
         sdbus_mock(), bus_mock(sdbusplus::get_mocked_new(&sdbus_mock)),
         helper(std::make_unique<DbusHelperMock>())
     {
-        EXPECT_CALL(*helper, getService(StrEq(SensorIntf), StrEq(path)))
+        EXPECT_CALL(*helper,
+                    getService(StrEq(SensorValue::interface), StrEq(path)))
             .WillOnce(Return("asdf"));
 
         EXPECT_CALL(*helper,
@@ -909,7 +903,9 @@ class DbusPassiveTest3kMaxIgnoredObj : public ::testing::Test
     std::unique_ptr<DbusHelperMock> helper;
     std::string type = "temp";
     std::string id = "id";
-    std::string path = "/xyz/openbmc_project/sensors/temperature/id";
+    std::string path =
+        std::format("{}/{}/id", SensorValue::namespace_path::value,
+                    SensorValue::namespace_path::temperature);
     int64_t _scale = -3;
     int64_t _value = 10;
 

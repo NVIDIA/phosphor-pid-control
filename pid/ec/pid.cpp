@@ -1,24 +1,12 @@
-/**
- * Copyright 2017 Google Inc.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+// SPDX-License-Identifier: Apache-2.0
+// SPDX-FileCopyrightText: Copyright 2017 Google Inc
 
 #include "pid.hpp"
 
 #include "logging.hpp"
 
-#include <iostream>
+#include <chrono>
+#include <string>
 
 namespace pid_control
 {
@@ -29,17 +17,17 @@ namespace ec
  *  clamp
  *
  */
-static double clamp(double clamp_x, double min, double max)
+static double clamp(double x, double min, double max)
 {
-    if (clamp_x < min)
+    if (x < min)
     {
         return min;
     }
-    else if (clamp_x > max)
+    if (x > max)
     {
         return max;
     }
-    return clamp_x;
+    return x;
 }
 
 /********************************
@@ -70,14 +58,14 @@ double pid(pid_info_t* pidinfoptr, double input, double setpoint,
     coreContext.input = input;
     coreContext.setpoint = setpoint;
 
-    double error = 0.0f;
+    double error;
 
-    double proportionalTerm = 0.0f;
+    double proportionalTerm;
     double integralTerm = 0.0f;
     double derivativeTerm = 0.0f;
     double feedFwdTerm = 0.0f;
 
-    double output = 0.0f;
+    double output;
 
     // calculate P, I, D, FF
 

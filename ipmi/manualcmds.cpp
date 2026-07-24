@@ -1,18 +1,5 @@
-/**
- * Copyright 2017 Google Inc.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+// SPDX-License-Identifier: Apache-2.0
+// SPDX-FileCopyrightText: Copyright 2017 Google Inc
 
 #include "manualcmds.hpp"
 
@@ -32,9 +19,8 @@ namespace pid_control::ipmi
 static constexpr auto manualProperty = "Manual";
 static constexpr auto failsafeProperty = "FailSafe";
 
-::ipmi::Cc ZoneControlIpmiHandler::getFailsafeModeState(const uint8_t* reqBuf,
-                                                        uint8_t* replyBuf,
-                                                        size_t* dataLen)
+::ipmi::Cc ZoneControlIpmiHandler::getFailsafeModeState(
+    const uint8_t* reqBuf, uint8_t* replyBuf, size_t* dataLen)
 {
     bool current;
 
@@ -46,8 +32,8 @@ static constexpr auto failsafeProperty = "FailSafe";
     const auto request =
         reinterpret_cast<const struct FanCtrlRequest*>(&reqBuf[0]);
 
-    ::ipmi::Cc rc = _control->getFanCtrlProperty(request->zone, &current,
-                                                 failsafeProperty);
+    ::ipmi::Cc rc =
+        _control->getFanCtrlProperty(request->zone, &current, failsafeProperty);
     if (rc)
     {
         return rc;
@@ -64,9 +50,8 @@ static constexpr auto failsafeProperty = "FailSafe";
  *   <arg name="properties" direction="out" type="a{sv}"/>
  * </method>
  */
-::ipmi::Cc ZoneControlIpmiHandler::getManualModeState(const uint8_t* reqBuf,
-                                                      uint8_t* replyBuf,
-                                                      size_t* dataLen)
+::ipmi::Cc ZoneControlIpmiHandler::getManualModeState(
+    const uint8_t* reqBuf, uint8_t* replyBuf, size_t* dataLen)
 {
     bool current;
 
@@ -78,8 +63,8 @@ static constexpr auto failsafeProperty = "FailSafe";
     const auto request =
         reinterpret_cast<const struct FanCtrlRequest*>(&reqBuf[0]);
 
-    ::ipmi::Cc rc = _control->getFanCtrlProperty(request->zone, &current,
-                                                 manualProperty);
+    ::ipmi::Cc rc =
+        _control->getFanCtrlProperty(request->zone, &current, manualProperty);
     if (rc)
     {
         return rc;
@@ -116,10 +101,9 @@ static constexpr auto failsafeProperty = "FailSafe";
 }
 
 /* Three command packages: get, set true, set false */
-::ipmi::Cc manualModeControl(ZoneControlIpmiHandler* handler,
-                             [[maybe_unused]] uint8_t cmd,
-                             const uint8_t* reqBuf, uint8_t* replyCmdBuf,
-                             size_t* dataLen)
+::ipmi::Cc manualModeControl(
+    ZoneControlIpmiHandler* handler, [[maybe_unused]] uint8_t cmd,
+    const uint8_t* reqBuf, uint8_t* replyCmdBuf, size_t* dataLen)
 {
     // FanCtrlRequest is the smaller of the requests, so it's at a minimum.
     if (*dataLen < sizeof(struct FanCtrlRequest))

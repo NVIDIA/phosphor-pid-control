@@ -1,18 +1,5 @@
-/**
- * Copyright 2017 Google Inc.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+// SPDX-License-Identifier: Apache-2.0
+// SPDX-FileCopyrightText: Copyright 2017 Google Inc
 
 #include "config.h"
 
@@ -24,6 +11,8 @@
 #include <phosphor-logging/log.hpp>
 #include <sdbusplus/bus.hpp>
 #include <sdbusplus/exception.hpp>
+#include <xyz/openbmc_project/ObjectMapper/common.hpp>
+#include <xyz/openbmc_project/Sensor/Value/client.hpp>
 
 #include <cstdint>
 #include <map>
@@ -31,6 +20,9 @@
 #include <string>
 #include <variant>
 #include <vector>
+
+using ObjectMapper = sdbusplus::common::xyz::openbmc_project::ObjectMapper;
+using SensorValue = sdbusplus::common::xyz::openbmc_project::sensor::Value;
 
 namespace pid_control
 {
@@ -47,10 +39,9 @@ using namespace phosphor::logging;
 std::string DbusHelper::getService(const std::string& intf,
                                    const std::string& path)
 {
-    auto mapper = _bus.new_method_call("xyz.openbmc_project.ObjectMapper",
-                                       "/xyz/openbmc_project/object_mapper",
-                                       "xyz.openbmc_project.ObjectMapper",
-                                       "GetObject");
+    auto mapper = _bus.new_method_call(
+        ObjectMapper::default_service, ObjectMapper::instance_path,
+        ObjectMapper::interface, ObjectMapper::method_names::get_object);
 
     mapper.append(path);
     mapper.append(std::vector<std::string>({intf}));
@@ -84,7 +75,7 @@ void DbusHelper::getProperties(const std::string& service,
     auto pimMsg = _bus.new_method_call(service.c_str(), path.c_str(),
                                        propertiesintf, "GetAll");
 
-    pimMsg.append(sensorintf);
+    pimMsg.append(SensorValue::interface);
 
     PropertyMap propMap;
 
@@ -108,14 +99,16 @@ void DbusHelper::getProperties(const std::string& service,
     // "Scale" x -3
 
     // If no error was set, the values should all be there.
-    auto findUnit = propMap.find("Unit");
+    auto findUnit = propMap.find(SensorValue::property_names::unit);
     if (findUnit != propMap.end())
     {
         prop->unit = std::get<std::string>(findUnit->second);
     }
+    // TODO: in PDI there is no such 'Scale' property on the Sensor.Value
+    // interface
     auto findScale = propMap.find("Scale");
-    auto findMax = propMap.find("MaxValue");
-    auto findMin = propMap.find("MinValue");
+    auto findMax = propMap.find(SensorValue::property_names::max_value);
+    auto findMin = propMap.find(SensorValue::property_names::min_value);
 
     prop->min = 0;
     prop->max = 0;
@@ -133,12 +126,15 @@ void DbusHelper::getProperties(const std::string& service,
         prop->min = std::visit(VariantToDoubleVisitor(), findMin->second);
     }
 
-    prop->value = std::visit(VariantToDoubleVisitor(), propMap["Value"]);
+    prop->value = std::visit(VariantToDoubleVisitor(),
+                             propMap[SensorValue::property_names::value]);
 
     bool available = true;
     try
     {
-        getProperty(service, path, availabilityIntf, "Available", available);
+        getProperty(service, path, StateDecoratorAvailability::interface,
+                    StateDecoratorAvailability::property_names::available,
+                    available);
     }
     catch (const sdbusplus::exception_t& ex)
     {
@@ -154,7 +150,7 @@ bool DbusHelper::thresholdsAsserted(const std::string& service,
 {
     auto critical = _bus.new_method_call(service.c_str(), path.c_str(),
                                          propertiesintf, "GetAll");
-    critical.append(criticalThreshInf);
+    critical.append(SensorThresholdCritical::interface);
     PropertyMap criticalMap;
 
     try
@@ -165,13 +161,16 @@ bool DbusHelper::thresholdsAsserted(const std::string& service,
     catch (const sdbusplus::exception_t&)
     {
         // do nothing, sensors don't have to expose critical thresholds
-#ifndef UNC_FAILSAFE
-        return false;
-#endif
+        if constexpr (!UNC_FAILSAFE)
+        {
+            return false;
+        }
     }
 
-    auto findCriticalLow = criticalMap.find("CriticalAlarmLow");
-    auto findCriticalHigh = criticalMap.find("CriticalAlarmHigh");
+    auto findCriticalLow = criticalMap.find(
+        SensorThresholdCritical::property_names::critical_alarm_low);
+    auto findCriticalHigh = criticalMap.find(
+        SensorThresholdCritical::property_names::critical_alarm_high);
 
     bool asserted = false;
     if (findCriticalLow != criticalMap.end())
@@ -185,12 +184,11 @@ bool DbusHelper::thresholdsAsserted(const std::string& service,
     {
         asserted = std::get<bool>(findCriticalHigh->second);
     }
-#ifdef UNC_FAILSAFE
-    if (!asserted)
+    if (UNC_FAILSAFE && !asserted)
     {
         auto warning = _bus.new_method_call(service.c_str(), path.c_str(),
                                             propertiesintf, "GetAll");
-        warning.append(warningThreshInf);
+        warning.append(SensorThresholdWarning::interface);
         PropertyMap warningMap;
 
         try
@@ -203,14 +201,14 @@ bool DbusHelper::thresholdsAsserted(const std::string& service,
             // sensors don't have to expose non-critical thresholds
             return false;
         }
-        auto findWarningHigh = warningMap.find("WarningAlarmHigh");
+        auto findWarningHigh = warningMap.find(
+            SensorThresholdWarning::property_names::warning_alarm_high);
 
         if (findWarningHigh != warningMap.end())
         {
             asserted = std::get<bool>(findWarningHigh->second);
         }
     }
-#endif
     return asserted;
 }
 

@@ -157,33 +157,17 @@ TEST(FanControllerTest, OutputProc_VerifiesIfFailsafeEnabledInputIsIgnored)
     // is below the failsafe minimum value, the input is not used and the fans
     // are driven at failsafe RPM (this assumes STRICT_FAILSAFE_PWM is not set)
 
-    ZoneMock* z = new ZoneMock();
-    ;
+    ZoneMock z;
 
     std::vector<std::string> inputs = {"fan0", "fan1"};
     ec::pidinfo initial;
 
-    initial.ts = 0;                // sample time in seconds
-    initial.proportionalCoeff = 0; // coeff for P
-    initial.integralCoeff = 0;     // coeff for I
-    initial.derivativeCoeff = 0;   // coeff for D
-    initial.feedFwdOffset = 0;     // offset coeff for feed-forward term
-    initial.feedFwdGain = 0;       // gain for feed-forward term
-    initial.integralLimit.min = 0; // clamp of integral
-    initial.integralLimit.max = 0;
-    initial.outLim.min = 0;        // clamp of output
-    initial.outLim.max = 0;
-    initial.slewNeg = 0;
-    initial.slewPos = 0;
-    initial.positiveHysteresis = 0;
-    initial.negativeHysteresis = 0;
-
     std::unique_ptr<PIDController> p =
-        FanController::createFanPid(z, "fan1", inputs, initial);
+        FanController::createFanPid(&z, "fan1", inputs, initial);
     EXPECT_FALSE(p == nullptr);
 
-    EXPECT_CALL(*z, getFailSafeMode()).WillOnce(Return(true));
-    EXPECT_CALL(*z, getFailSafePercent()).WillOnce(Return(75.0));
+    EXPECT_CALL(z, getFailSafeMode()).WillOnce(Return(true));
+    EXPECT_CALL(z, getFailSafePercent()).WillOnce(Return(75.0));
 
     int64_t timeout = 0;
     std::unique_ptr<Sensor> s1 = std::make_unique<SensorMock>("fan0", timeout);
@@ -192,12 +176,12 @@ TEST(FanControllerTest, OutputProc_VerifiesIfFailsafeEnabledInputIsIgnored)
     SensorMock* sm1 = reinterpret_cast<SensorMock*>(s1.get());
     SensorMock* sm2 = reinterpret_cast<SensorMock*>(s2.get());
 
-    EXPECT_CALL(*z, getRedundantWrite())
+    EXPECT_CALL(z, getRedundantWrite())
         .WillOnce(Return(false))
         .WillOnce(Return(false));
-    EXPECT_CALL(*z, getSensor(StrEq("fan0"))).WillOnce(Return(s1.get()));
+    EXPECT_CALL(z, getSensor(StrEq("fan0"))).WillOnce(Return(s1.get()));
     EXPECT_CALL(*sm1, write(0.75, false, _));
-    EXPECT_CALL(*z, getSensor(StrEq("fan1"))).WillOnce(Return(s2.get()));
+    EXPECT_CALL(z, getSensor(StrEq("fan1"))).WillOnce(Return(s2.get()));
     EXPECT_CALL(*sm2, write(0.75, false, _));
 
     // This is a fan PID, so calling outputProc will try to write this value
@@ -206,8 +190,6 @@ TEST(FanControllerTest, OutputProc_VerifiesIfFailsafeEnabledInputIsIgnored)
     // Setting 50%, will end up being 75% because the sensors are in failsafe
     // mode.
     p->outputProc(50.0);
-
-    delete z;
 }
 
 TEST(FanControllerTest, OutputProc_BehavesAsExpected)
@@ -215,32 +197,16 @@ TEST(FanControllerTest, OutputProc_BehavesAsExpected)
     // Verifies that when the system is not in failsafe mode, the input value
     // to outputProc is used to drive the sensors (fans).
 
-    ZoneMock* z = new ZoneMock();
-    ;
+    ZoneMock z;
 
     std::vector<std::string> inputs = {"fan0", "fan1"};
     ec::pidinfo initial;
 
-    initial.ts = 0;                // sample time in seconds
-    initial.proportionalCoeff = 0; // coeff for P
-    initial.integralCoeff = 0;     // coeff for I
-    initial.derivativeCoeff = 0;   // coeff for D
-    initial.feedFwdOffset = 0;     // offset coeff for feed-forward term
-    initial.feedFwdGain = 0;       // gain for feed-forward term
-    initial.integralLimit.min = 0; // clamp of integral
-    initial.integralLimit.max = 0;
-    initial.outLim.min = 0;        // clamp of output
-    initial.outLim.max = 0;
-    initial.slewNeg = 0;
-    initial.slewPos = 0;
-    initial.positiveHysteresis = 0;
-    initial.negativeHysteresis = 0;
-
     std::unique_ptr<PIDController> p =
-        FanController::createFanPid(z, "fan1", inputs, initial);
+        FanController::createFanPid(&z, "fan1", inputs, initial);
     EXPECT_FALSE(p == nullptr);
 
-    EXPECT_CALL(*z, getFailSafeMode()).WillOnce(Return(false));
+    EXPECT_CALL(z, getFailSafeMode()).WillOnce(Return(false));
 
     int64_t timeout = 0;
     std::unique_ptr<Sensor> s1 = std::make_unique<SensorMock>("fan0", timeout);
@@ -249,19 +215,17 @@ TEST(FanControllerTest, OutputProc_BehavesAsExpected)
     SensorMock* sm1 = reinterpret_cast<SensorMock*>(s1.get());
     SensorMock* sm2 = reinterpret_cast<SensorMock*>(s2.get());
 
-    EXPECT_CALL(*z, getRedundantWrite())
+    EXPECT_CALL(z, getRedundantWrite())
         .WillOnce(Return(false))
         .WillOnce(Return(false));
-    EXPECT_CALL(*z, getSensor(StrEq("fan0"))).WillOnce(Return(s1.get()));
+    EXPECT_CALL(z, getSensor(StrEq("fan0"))).WillOnce(Return(s1.get()));
     EXPECT_CALL(*sm1, write(0.5, false, _));
-    EXPECT_CALL(*z, getSensor(StrEq("fan1"))).WillOnce(Return(s2.get()));
+    EXPECT_CALL(z, getSensor(StrEq("fan1"))).WillOnce(Return(s2.get()));
     EXPECT_CALL(*sm2, write(0.5, false, _));
 
     // This is a fan PID, so calling outputProc will try to write this value
     // to the sensors.
     p->outputProc(50.0);
-
-    delete z;
 }
 
 TEST(FanControllerTest, OutputProc_VerifyFailSafeWhenInputHigher)
@@ -272,19 +236,18 @@ TEST(FanControllerTest, OutputProc_VerifyFailSafeWhenInputHigher)
     // If STRICT_FAILSAFE_PWM is defined, we expect the FailSafe PWM to be
     // capped to the failsafe PWM, and not go higher than that.
 
-    ZoneMock* z = new ZoneMock();
-    ;
+    ZoneMock z;
 
     std::vector<std::string> inputs = {"fan0"};
     ec::pidinfo initial;
     const double failsafePWM = 75.0;
 
     std::unique_ptr<PIDController> p =
-        FanController::createFanPid(z, "fan1", inputs, initial);
+        FanController::createFanPid(&z, "fan1", inputs, initial);
     EXPECT_FALSE(p == nullptr);
 
-    EXPECT_CALL(*z, getFailSafeMode()).WillOnce(Return(true));
-    EXPECT_CALL(*z, getFailSafePercent()).WillOnce(Return(failsafePWM));
+    EXPECT_CALL(z, getFailSafeMode()).WillOnce(Return(true));
+    EXPECT_CALL(z, getFailSafePercent()).WillOnce(Return(failsafePWM));
 
     int64_t timeout = 0;
     std::unique_ptr<Sensor> s1 = std::make_unique<SensorMock>("fan0", timeout);
@@ -293,24 +256,23 @@ TEST(FanControllerTest, OutputProc_VerifyFailSafeWhenInputHigher)
 
     double percent = 80;
 
-    EXPECT_CALL(*z, getRedundantWrite()).WillOnce(Return(false));
-    EXPECT_CALL(*z, getSensor(StrEq("fan0"))).WillOnce(Return(s1.get()));
-
-#ifdef STRICT_FAILSAFE_PWM
-    double failsafeValue = failsafePWM / 100;
-    EXPECT_CALL(*sm1, write(failsafeValue, false, _));
-#else
-
-    // Converting from double to double for expectation.
-    double value = percent / 100;
-    EXPECT_CALL(*sm1, write(value, false, _));
-#endif
+    EXPECT_CALL(z, getRedundantWrite()).WillOnce(Return(false));
+    EXPECT_CALL(z, getSensor(StrEq("fan0"))).WillOnce(Return(s1.get()));
+    if constexpr (STRICT_FAILSAFE_PWM)
+    {
+        double failsafeValue = failsafePWM / 100;
+        EXPECT_CALL(*sm1, write(failsafeValue, false, _));
+    }
+    else
+    {
+        // Converting from double to double for expectation.
+        double value = percent / 100;
+        EXPECT_CALL(*sm1, write(value, false, _));
+    }
 
     // This is a fan PID, so calling outputProc will try to write this value
     // to the sensors.
     p->outputProc(percent);
-
-    delete z;
 }
 
 TEST(FanControllerTest, OutputProc_VerifyRedundantWrites)
@@ -318,16 +280,16 @@ TEST(FanControllerTest, OutputProc_VerifyRedundantWrites)
     /* when a zone indicates that redundant writes are enabled
      * make sure the fan controller honors this by forcing a sensor write
      */
-    ZoneMock* z = new ZoneMock();
+    ZoneMock z;
 
     std::vector<std::string> inputs = {"fan0", "fan1"};
     ec::pidinfo initial;
 
     std::unique_ptr<PIDController> p =
-        FanController::createFanPid(z, "fan1", inputs, initial);
+        FanController::createFanPid(&z, "fan1", inputs, initial);
     EXPECT_FALSE(p == nullptr);
 
-    EXPECT_CALL(*z, getFailSafeMode()).WillOnce(Return(false));
+    EXPECT_CALL(z, getFailSafeMode()).WillOnce(Return(false));
 
     int64_t timeout = 0;
     std::unique_ptr<Sensor> s1 = std::make_unique<SensorMock>("fan0", timeout);
@@ -336,19 +298,17 @@ TEST(FanControllerTest, OutputProc_VerifyRedundantWrites)
     SensorMock* sm1 = reinterpret_cast<SensorMock*>(s1.get());
     SensorMock* sm2 = reinterpret_cast<SensorMock*>(s2.get());
 
-    EXPECT_CALL(*z, getRedundantWrite())
+    EXPECT_CALL(z, getRedundantWrite())
         .WillOnce(Return(true))
         .WillOnce(Return(true));
-    EXPECT_CALL(*z, getSensor(StrEq("fan0"))).WillOnce(Return(s1.get()));
+    EXPECT_CALL(z, getSensor(StrEq("fan0"))).WillOnce(Return(s1.get()));
     EXPECT_CALL(*sm1, write(0.5, true, _));
-    EXPECT_CALL(*z, getSensor(StrEq("fan1"))).WillOnce(Return(s2.get()));
+    EXPECT_CALL(z, getSensor(StrEq("fan1"))).WillOnce(Return(s2.get()));
     EXPECT_CALL(*sm2, write(0.5, true, _));
 
     // This is a fan PID, so calling outputProc will try to write this value
     // to the sensors.
     p->outputProc(50.0);
-
-    delete z;
 }
 
 } // namespace

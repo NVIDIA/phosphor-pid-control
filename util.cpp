@@ -33,10 +33,6 @@ void debugPrint(const std::map<std::string, conf::SensorConfig>& sensorConfig,
                 const std::map<int64_t, conf::PIDConf>& zoneConfig,
                 const std::map<int64_t, conf::ZoneConfig>& zoneDetailsConfig)
 {
-    if constexpr (!conf::DEBUG)
-    {
-        return;
-    }
     // print sensor config
     std::cout << "sensor config:\n";
     std::cout << "{\n";
@@ -49,7 +45,8 @@ void debugPrint(const std::map<std::string, conf::SensorConfig>& sensorConfig,
         std::cout << pair.second.min << ", ";
         std::cout << pair.second.max << ", ";
         std::cout << pair.second.timeout << ", ";
-        std::cout << pair.second.unavailableAsFailed << "},\n\t},\n";
+        std::cout << pair.second.unavailableAsFailed << ", ";
+        std::cout << pair.second.ignoreFailIfHostOff << "},\n\t},\n";
     }
     std::cout << "}\n\n";
     std::cout << "ZoneDetailsConfig\n";
@@ -105,10 +102,10 @@ void debugPrint(const std::map<std::string, conf::SensorConfig>& sensorConfig,
     std::cout << "}\n\n";
 }
 
-std::vector<conf::SensorInput>
-    spliceInputs(const std::vector<std::string>& inputNames,
-                 const std::vector<double>& inputTempToMargin,
-                 const std::vector<std::string>& missingAcceptableNames)
+std::vector<conf::SensorInput> spliceInputs(
+    const std::vector<std::string>& inputNames,
+    const std::vector<double>& inputTempToMargin,
+    const std::vector<std::string>& missingAcceptableNames)
 {
     std::vector<conf::SensorInput> results;
 
@@ -157,8 +154,8 @@ std::vector<conf::SensorInput>
     return results;
 }
 
-std::vector<std::string>
-    splitNames(const std::vector<conf::SensorInput>& sensorInputs)
+std::vector<std::string> splitNames(
+    const std::vector<conf::SensorInput>& sensorInputs)
 {
     std::vector<std::string> results;
 

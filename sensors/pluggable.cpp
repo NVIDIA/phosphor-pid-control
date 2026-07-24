@@ -1,21 +1,9 @@
-/**
- * Copyright 2017 Google Inc.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+// SPDX-License-Identifier: Apache-2.0
+// SPDX-FileCopyrightText: Copyright 2017 Google Inc
 
 #include "pluggable.hpp"
 
+#include "hoststatemonitor.hpp"
 #include "interfaces.hpp"
 
 #include <cstdint>
@@ -41,7 +29,18 @@ void PluggableSensor::write(double value, bool force, int64_t* written)
 
 bool PluggableSensor::getFailed(void)
 {
-    return _reader->getFailed();
+    bool isFailed = _reader->getFailed();
+
+    if (isFailed && getIgnoreFailIfHostOff())
+    {
+        auto& hostState = HostStateMonitor::getInstance();
+        if (!hostState.isPowerOn())
+        {
+            return false;
+        }
+    }
+
+    return isFailed;
 }
 
 std::string PluggableSensor::getFailReason(void)

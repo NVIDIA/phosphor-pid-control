@@ -1,22 +1,10 @@
-/**
- * Copyright 2017 Google Inc.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+// SPDX-License-Identifier: Apache-2.0
+// SPDX-FileCopyrightText: Copyright 2017 Google Inc
 
 #include "host.hpp"
 
 #include "failsafeloggers/failsafe_logger_utility.hpp"
+#include "hoststatemonitor.hpp"
 #include "interfaces.hpp"
 #include "sensor.hpp"
 
@@ -34,22 +22,12 @@
 namespace pid_control
 {
 
-template <typename T>
-void scaleHelper(T& ptr, int64_t value)
-{
-    if constexpr (std::is_same_v<ValueType, int64_t>)
-    {
-        ptr->scale(value);
-    }
-}
-
-std::unique_ptr<Sensor> HostSensor::createTemp(const std::string& name,
-                                               int64_t timeout,
-                                               sdbusplus::bus_t& bus,
-                                               const char* objPath, bool defer)
+std::unique_ptr<Sensor> HostSensor::createTemp(
+    const std::string& name, int64_t timeout, sdbusplus::bus_t& bus,
+    const char* objPath, bool defer, bool ignoreFailIfHostOff)
 {
     auto sensor = std::make_unique<HostSensor>(name, timeout, bus, objPath,
-                                               defer);
+                                               defer, ignoreFailIfHostOff);
     sensor->value(0);
 
     // DegreesC and value of 0 are the defaults at present, therefore testing
@@ -58,7 +36,6 @@ std::unique_ptr<Sensor> HostSensor::createTemp(const std::string& name,
     // TODO(venture): Need to not hard-code that this is DegreesC and scale
     // 10x-3 unless it is! :D
     sensor->unit(ValueInterface::Unit::DegreesC);
-    scaleHelper(sensor, -3);
     sensor->emit_object_added();
     // emit_object_added() can be called twice, harmlessly, the second time it
     // doesn't actually happen, but we don't want to call it before we set up
@@ -71,22 +48,12 @@ std::unique_ptr<Sensor> HostSensor::createTemp(const std::string& name,
     return sensor;
 }
 
-template <typename T>
-int64_t getScale(T* sensor)
-{
-    if constexpr (std::is_same_v<ValueType, int64_t>)
-    {
-        return sensor->scale();
-    }
-    return 0;
-}
-
-ValueType HostSensor::value(ValueType value)
+double HostSensor::value(double value)
 {
     std::lock_guard<std::mutex> guard(_lock);
 
     _updated = std::chrono::high_resolution_clock::now();
-    _value = value * pow(10, getScale(this)); /* scale value */
+    _value = value * pow(10, 0); /* scale value */
 
     return ValueObject::value(value);
 }
@@ -111,6 +78,15 @@ bool HostSensor::getFailed(void)
     if (std::isfinite(_value))
     {
         return false;
+    }
+
+    if (getIgnoreFailIfHostOff())
+    {
+        auto& hostState = HostStateMonitor::getInstance();
+        if (!hostState.isPowerOn())
+        {
+            return false;
+        }
     }
 
     outputFailsafeLogWithSensor(getName(), true, getName(),

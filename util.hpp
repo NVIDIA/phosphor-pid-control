@@ -28,11 +28,6 @@ struct SensorThresholds
     double upperThreshold = std::numeric_limits<double>::quiet_NaN();
 };
 
-const std::string sensorintf = "xyz.openbmc_project.Sensor.Value";
-const std::string criticalThreshInf =
-    "xyz.openbmc_project.Sensor.Threshold.Critical";
-const std::string propertiesintf = "org.freedesktop.DBus.Properties";
-
 /*
  * Given a path that optionally has a glob portion, fill it out.
  */
@@ -42,16 +37,16 @@ std::string FixupPath(std::string original);
  * Splice together two vectors, "Inputs" and "TempToMargin" from JSON,
  * into one vector of SensorInput structures containing info from both.
  */
-std::vector<conf::SensorInput>
-    spliceInputs(const std::vector<std::string>& inputNames,
-                 const std::vector<double>& inputTempToMargin,
-                 const std::vector<std::string>& missingAcceptableNames);
+std::vector<conf::SensorInput> spliceInputs(
+    const std::vector<std::string>& inputNames,
+    const std::vector<double>& inputTempToMargin,
+    const std::vector<std::string>& missingAcceptableNames);
 
 /*
  * Recovers the original "Inputs" vector from spliceInputs().
  */
-std::vector<std::string>
-    splitNames(const std::vector<conf::SensorInput>& sensorInputs);
+std::vector<std::string> splitNames(
+    const std::vector<conf::SensorInput>& sensorInputs);
 
 /*
  * Dump active configuration.

@@ -31,6 +31,7 @@ struct SensorConfig
     int64_t timeout;
     bool ignoreDbusMinMax;
     bool unavailableAsFailed;
+    bool ignoreFailIfHostOff;
 };
 
 /*
@@ -92,8 +93,6 @@ struct ZoneConfig
 };
 
 using PIDConf = std::map<std::string, ControllerInfo>;
-
-constexpr bool DEBUG = false; // enable to print found configuration
 
 } // namespace conf
 

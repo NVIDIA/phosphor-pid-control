@@ -6,6 +6,7 @@
 #include <systemd/sd-bus.h>
 
 #include <sdbusplus/test/sdbus_mock.hpp>
+#include <xyz/openbmc_project/Sensor/Value/common.hpp>
 
 #include <chrono>
 #include <cstdint>
@@ -20,6 +21,8 @@ namespace pid_control
 {
 namespace
 {
+
+using SensorValue = sdbusplus::common::xyz::openbmc_project::sensor::Value;
 
 using ::testing::IsNull;
 using ::testing::Return;
@@ -42,22 +45,22 @@ TEST(HostSensorTest, CreateHostTempSensorTest)
     int64_t timeout = 1;
     const char* objPath = "/asdf/asdf0";
     bool defer = false;
-    std::string interface = "xyz.openbmc_project.Sensor.Value";
 
     std::vector<std::string> properties = {};
     double d;
 
     // The createTemp updates all the properties, however, only Scale is set
     // to non-default.
-    SetupDbusObject(&sdbus_mock, defer, objPath, interface, properties, &d);
+    SetupDbusObject(&sdbus_mock, defer, objPath, SensorValue::interface,
+                    properties, &d);
 
     // This is called during object destruction.
     EXPECT_CALL(sdbus_mock,
                 sd_bus_emit_object_removed(IsNull(), StrEq(objPath)))
         .WillOnce(Return(0));
 
-    std::unique_ptr<Sensor> s = HostSensor::createTemp(name, timeout, bus_mock,
-                                                       objPath, defer);
+    std::unique_ptr<Sensor> s =
+        HostSensor::createTemp(name, timeout, bus_mock, objPath, defer);
 }
 
 TEST(HostSensorTest, VerifyWriteThenReadMatches)
@@ -71,19 +74,19 @@ TEST(HostSensorTest, VerifyWriteThenReadMatches)
     int64_t timeout = 1;
     const char* objPath = "/asdf/asdf0";
     bool defer = false;
-    std::string interface = "xyz.openbmc_project.Sensor.Value";
 
     std::vector<std::string> properties = {};
     double d;
 
-    SetupDbusObject(&sdbus_mock, defer, objPath, interface, properties, &d);
+    SetupDbusObject(&sdbus_mock, defer, objPath, SensorValue::interface,
+                    properties, &d);
 
     EXPECT_CALL(sdbus_mock,
                 sd_bus_emit_object_removed(IsNull(), StrEq(objPath)))
         .WillOnce(Return(0));
 
-    std::unique_ptr<Sensor> s = HostSensor::createTemp(name, timeout, bus_mock,
-                                                       objPath, defer);
+    std::unique_ptr<Sensor> s =
+        HostSensor::createTemp(name, timeout, bus_mock, objPath, defer);
 
     // Value is updated from dbus calls only (normally).
     HostSensor* hs = static_cast<HostSensor*>(s.get());
@@ -92,15 +95,15 @@ TEST(HostSensorTest, VerifyWriteThenReadMatches)
     ReadReturn r = hs->read();
     EXPECT_EQ(r.value, 0);
 
-    EXPECT_CALL(sdbus_mock,
-                sd_bus_emit_properties_changed_strv(
-                    IsNull(), StrEq(objPath), StrEq(interface), NotNull()))
+    EXPECT_CALL(sdbus_mock, sd_bus_emit_properties_changed_strv(
+                                IsNull(), StrEq(objPath),
+                                StrEq(SensorValue::interface), NotNull()))
         .WillOnce(Invoke(
             [=]([[maybe_unused]] sd_bus* bus, [[maybe_unused]] const char* path,
                 [[maybe_unused]] const char* interface, const char** names) {
-        EXPECT_STREQ("Value", names[0]);
-        return 0;
-    }));
+                EXPECT_STREQ("Value", names[0]);
+                return 0;
+            }));
 
     std::chrono::high_resolution_clock::time_point t1 =
         std::chrono::high_resolution_clock::now();

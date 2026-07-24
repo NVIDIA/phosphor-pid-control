@@ -22,6 +22,7 @@
 #include <phosphor-logging/log.hpp>
 #include <sdbusplus/bus.hpp>
 #include <sdbusplus/exception.hpp>
+#include <xyz/openbmc_project/Control/FanPwm/client.hpp>
 
 #include <cstdint>
 #include <exception>
@@ -29,10 +30,10 @@
 #include <string>
 #include <variant>
 
+using ControlFanPwm = sdbusplus::common::xyz::openbmc_project::control::FanPwm;
+
 namespace pid_control
 {
-
-constexpr const char* pwmInterface = "xyz.openbmc_project.Control.FanPwm";
 
 using namespace phosphor::logging;
 
@@ -44,7 +45,7 @@ std::unique_ptr<WriteInterface> DbusWritePercent::createDbusWrite(
 
     try
     {
-        connectionName = helper->getService(pwmInterface, path);
+        connectionName = helper->getService(ControlFanPwm::interface, path);
     }
     catch (const std::exception& e)
     {
@@ -80,10 +81,10 @@ void DbusWritePercent::write(double value, bool force, int64_t* written)
         }
     }
     auto writeBus = sdbusplus::bus::new_default();
-    auto mesg = writeBus.new_method_call(connectionName.c_str(), path.c_str(),
-                                         "org.freedesktop.DBus.Properties",
-                                         "Set");
-    mesg.append(pwmInterface, "Target",
+    auto mesg =
+        writeBus.new_method_call(connectionName.c_str(), path.c_str(),
+                                 "org.freedesktop.DBus.Properties", "Set");
+    mesg.append(ControlFanPwm::interface, ControlFanPwm::property_names::target,
                 std::variant<uint64_t>(static_cast<uint64_t>(ovalue)));
 
     try
@@ -105,16 +106,15 @@ void DbusWritePercent::write(double value, bool force, int64_t* written)
     return;
 }
 
-std::unique_ptr<WriteInterface>
-    DbusWrite::createDbusWrite(const std::string& path, int64_t min,
-                               int64_t max,
-                               std::unique_ptr<DbusHelperInterface> helper)
+std::unique_ptr<WriteInterface> DbusWrite::createDbusWrite(
+    const std::string& path, int64_t min, int64_t max,
+    std::unique_ptr<DbusHelperInterface> helper)
 {
     std::string connectionName;
 
     try
     {
-        connectionName = helper->getService(pwmInterface, path);
+        connectionName = helper->getService(ControlFanPwm::interface, path);
     }
     catch (const std::exception& e)
     {
@@ -143,10 +143,10 @@ void DbusWrite::write(double value, bool force, int64_t* written)
         }
     }
     auto writeBus = sdbusplus::bus::new_default();
-    auto mesg = writeBus.new_method_call(connectionName.c_str(), path.c_str(),
-                                         "org.freedesktop.DBus.Properties",
-                                         "Set");
-    mesg.append(pwmInterface, "Target",
+    auto mesg =
+        writeBus.new_method_call(connectionName.c_str(), path.c_str(),
+                                 "org.freedesktop.DBus.Properties", "Set");
+    mesg.append(ControlFanPwm::interface, ControlFanPwm::property_names::target,
                 std::variant<uint64_t>(static_cast<uint64_t>(value)));
 
     try

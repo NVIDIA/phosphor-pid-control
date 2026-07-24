@@ -1,23 +1,9 @@
-/**
- * Copyright 2017 Google Inc.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+// SPDX-License-Identifier: Apache-2.0
+// SPDX-FileCopyrightText: Copyright 2017 Google Inc
 
 /* Configuration. */
 #include "zone.hpp"
 
-#include "actioncontroller.hpp"
 #include "conf.hpp"
 #include "failsafeloggers/failsafe_logger_utility.hpp"
 #include "interfaces.hpp"
@@ -125,9 +111,12 @@ void DbusPidZone::markSensorMissing(const std::string& name,
     }
     else
     {
-        _failSafeSensors[name] = std::pair(failReason,
-                                           _sensorFailSafePercent[name]);
+        _failSafeSensors[name] =
+            std::pair(failReason, _sensorFailSafePercent[name]);
     }
+
+    outputFailsafeLogWithZone(_zoneId, this->getFailSafeMode(), name,
+                              "The sensor is missing.");
 
     if (debugEnabled)
     {
@@ -201,16 +190,16 @@ double DbusPidZone::getFailSafePercent(void)
         return _zoneFailSafePercent;
     }
 
-    FailSafeSensorsMap::iterator maxData =
-        std::max_element(_failSafeSensors.begin(), _failSafeSensors.end(),
-                         [](const FailSafeSensorPair& firstData,
-                            const FailSafeSensorPair& secondData) {
-        return firstData.second.second < secondData.second.second;
-    });
+    FailSafeSensorsMap::iterator maxData = std::max_element(
+        _failSafeSensors.begin(), _failSafeSensors.end(),
+        [](const FailSafeSensorPair& firstData,
+           const FailSafeSensorPair& secondData) {
+            return firstData.second.second < secondData.second.second;
+        });
 
     // In dbus/dbusconfiguration.cpp, the default sensor failsafepercent is 0 if
     // there is no setting in json.
-    // Therfore, if the max failsafe duty in _failSafeSensors is 0, set final
+    // Therefore, if the max failsafe duty in _failSafeSensors is 0, set final
     // failsafe duty to _zoneFailSafePercent.
     if ((*maxData).second.second == 0)
     {
@@ -475,8 +464,6 @@ void DbusPidZone::writeLog(const std::string& value)
  */
 void DbusPidZone::updateFanTelemetry(void)
 {
-    boost::asio::io_context io;
-    auto conn = std::make_shared<sdbusplus::asio::connection>(io);
     /* TODO(venture): Should I just make _log point to /dev/null when logging
      * is disabled?  I think it's a waste to try and log things even if the
      * data is just being dropped though.
@@ -601,10 +588,9 @@ bool DbusPidZone::failSafe() const
     return getFailSafeMode();
 }
 
-void DbusPidZone::addPidControlProcess(const std::string& name,
-                                       const std::string& type, double setpoint,
-                                       sdbusplus::bus_t& bus,
-                                       const std::string& objPath, bool defer)
+void DbusPidZone::addPidControlProcess(
+    const std::string& name, const std::string& type, double setpoint,
+    sdbusplus::bus_t& bus, const std::string& objPath, bool defer)
 {
     _pidsControlProcess[name] = std::make_unique<ProcessObject>(
         bus, objPath.c_str(),
@@ -671,9 +657,8 @@ std::string DbusPidZone::leader() const
     return _maximumSetPointName;
 }
 
-void DbusPidZone::updateThermalPowerDebugInterface(std::string pidName,
-                                                   std::string leader,
-                                                   double input, double output)
+void DbusPidZone::updateThermalPowerDebugInterface(
+    std::string pidName, std::string leader, double input, double output)
 {
     if (leader.empty())
     {

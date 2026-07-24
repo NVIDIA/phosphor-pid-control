@@ -15,13 +15,29 @@ cxx = meson.get_compiler('cpp')
 
 conf_data = configuration_data()
 
-conf_data.set('STRICT_FAILSAFE_PWM', get_option('strict-failsafe-pwm'))
-conf_data.set('OFFLINE_FAILSAFE_PWM', get_option('offline-failsafe-pwm'))
-conf_data.set('UNC_FAILSAFE', get_option('unc-failsafe'))
-conf_data.set(
-    'HANDLE_MISSING_OBJECT_PATHS',
-    get_option('handle-missing-object-paths'),
-)
+if get_option('strict-failsafe-pwm')
+    conf_data.set('STRICT_FAILSAFE_PWM', 1)
+else
+    conf_data.set('STRICT_FAILSAFE_PWM', 0)
+endif
+
+if get_option('offline-failsafe-pwm')
+    conf_data.set('OFFLINE_FAILSAFE_PWM', 1)
+else
+    conf_data.set('OFFLINE_FAILSAFE_PWM', 0)
+endif
+
+if get_option('unc-failsafe')
+    conf_data.set('UNC_FAILSAFE', 1)
+else
+    conf_data.set('UNC_FAILSAFE', 0)
+endif
+
+if get_option('handle-missing-object-paths')
+    conf_data.set('HANDLE_MISSING_OBJECT_PATHS', 1)
+else
+    conf_data.set('HANDLE_MISSING_OBJECT_PATHS', 0)
+endif
 
 configure_file(output: 'config.h', configuration: conf_data)
 
@@ -78,7 +94,11 @@ ipmid_dep = dependency('libipmid')
 if cxx.has_header('CLI/CLI.hpp')
     CLI11_dep = declare_dependency()
 else
-    CLI11_dep = dependency('CLI11')
+    CLI11_dep = dependency(
+        'CLI11',
+        include_type: 'system',
+        default_options: ['tests=disabled'],
+    )
 endif
 
 deps = [
@@ -96,7 +116,6 @@ root_inc = include_directories(
     'buildjson',
     'dbus',
     'errors',
-    'experiments',
     'ipmi',
     'notimpl',
     'pid',
@@ -131,7 +150,6 @@ libswampd_sources = [
     'pid/ec/pid.cpp',
     'pid/ec/logging.cpp',
     'pid/ec/stepwise.cpp',
-    'pid/actioncontroller.cpp',
     'pid/fancontroller.cpp',
     'pid/thermalcontroller.cpp',
     'pid/pidcontroller.cpp',
@@ -143,7 +161,6 @@ libswampd_sources = [
     'pid/pidloop.cpp',
     'pid/tuning.cpp',
     'buildjson/buildjson.cpp',
-    'experiments/drive.cpp',
 ]
 
 libmanualcmds_sources = [
